@@ -1,10 +1,13 @@
+import type { FirebaseApp, FirebaseOptions } from 'firebase/app';
 import { initializeApp } from 'firebase/app';
+import type { Auth } from 'firebase/auth';
 import { getAuth } from 'firebase/auth';
+import type { Firestore } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore';
+import type { FirebaseStorage } from 'firebase/storage';
 import { getStorage } from 'firebase/storage';
 
-// Firebase configuration from environment variables
-const firebaseConfig = {
+const firebaseConfig: Record<string, string | undefined> = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -13,23 +16,31 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Check if Firebase config is properly set
-const isFirebaseConfigured = Object.values(firebaseConfig).every(
-  (value) => value && value !== 'AIzaSyC_f3lmtg7E4I-k94s6pMSN_X6vYtEJXso'
-);
+const missingConfigKeys = Object.entries(firebaseConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
 
-if (!isFirebaseConfigured) {
-  console.warn(
-    'Firebase configuration is not properly set. Please update .env.local with your Firebase credentials.'
-  );
+export const firebaseInitError = missingConfigKeys.length
+  ? new Error(
+      `Firebase configuration is not properly set. Missing environment variables: ${missingConfigKeys.join(
+        ', '
+      )}. Create a frontend--/.env.local file from frontend--/.env.example.`
+    )
+  : null;
+
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
+
+if (!firebaseInitError) {
+  app = initializeApp(firebaseConfig as FirebaseOptions);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  storage = getStorage(app);
+} else {
+  console.warn(firebaseInitError.message);
 }
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firebase services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-
+export { app, auth, db, storage };
 export default app;

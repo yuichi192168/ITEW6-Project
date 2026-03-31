@@ -52,13 +52,15 @@ export const AdminDashboard: React.FC = () => {
     announcementsDB.getAllAnnouncements().then((data: any) => data)
   );
 
+  // Initial Fetch on Mount
   useEffect(() => {
     fetchStudents();
     fetchFaculty();
     fetchCourses();
     fetchEvents();
     fetchAnnouncements();
-  }, [fetchStudents, fetchFaculty, fetchCourses, fetchEvents, fetchAnnouncements]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
 
   const refreshAll = () => {
     fetchStudents();
@@ -68,6 +70,7 @@ export const AdminDashboard: React.FC = () => {
     fetchAnnouncements();
   };
 
+  // Event Listeners for real-time updates
   useEffect(() => {
     const onUpdated = () => refreshAll();
 
@@ -86,15 +89,23 @@ export const AdminDashboard: React.FC = () => {
       window.removeEventListener('announcementsUpdated', onUpdated);
       window.removeEventListener('researchUpdated', onUpdated);
     };
-  }, [fetchStudents, fetchFaculty, fetchCourses, fetchEvents, fetchAnnouncements]);
+  }, []);
 
-  const hasError = studentsError || facultyError || coursesError || eventsError || announcementsError;
+  // Log specific errors to console for easier debugging
+  useEffect(() => {
+    if (studentsError) console.error("Firebase Students Error:", studentsError);
+    if (facultyError) console.error("Firebase Faculty Error:", facultyError);
+    if (coursesError) console.error("Firebase Courses Error:", coursesError);
+    if (eventsError) console.error("Firebase Events Error:", eventsError);
+    if (announcementsError) console.error("Firebase Announcements Error:", announcementsError);
+  }, [studentsError, facultyError, coursesError, eventsError, announcementsError]);
+
+  const hasError = !!(studentsError || facultyError || coursesError || eventsError || announcementsError);
 
   // Calculate comprehensive statistics
   const departmentStats = useMemo(() => {
     const deptMap = new Map<string, { students: number; faculty: number }>();
 
-    // Count students by program (treating program as department)
     students?.forEach(student => {
       const dept = student.program || 'Unknown';
       if (!deptMap.has(dept)) {
@@ -103,7 +114,6 @@ export const AdminDashboard: React.FC = () => {
       deptMap.get(dept)!.students++;
     });
 
-    // Count faculty by department
     faculty?.forEach(fac => {
       const dept = fac.department || 'Unknown';
       if (!deptMap.has(dept)) {
@@ -145,14 +155,14 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {hasError && <ErrorMessage message="Failed to load dashboard data. Using fallback data." />}
+      {hasError && <ErrorMessage message="Failed to load dashboard data. Check console for details." />}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="card">
+            <div key={stat.label} className="card bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-sm">{stat.label}</p>
@@ -169,7 +179,7 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Department Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="card">
+        <div className="card bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Students by Program</h2>
           {departmentStats.length === 0 ? (
             <EmptyState
@@ -186,7 +196,7 @@ export const AdminDashboard: React.FC = () => {
                     <p className="text-xs text-gray-600">{dept.students} students</p>
                   </div>
                   <div className="text-right">
-                    <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
+                    <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full font-medium">
                       {dept.students}
                     </span>
                   </div>
@@ -196,7 +206,7 @@ export const AdminDashboard: React.FC = () => {
           )}
         </div>
 
-        <div className="card">
+        <div className="card bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Faculty by Department</h2>
           {departmentStats.length === 0 ? (
             <EmptyState
@@ -213,7 +223,7 @@ export const AdminDashboard: React.FC = () => {
                     <p className="text-xs text-gray-600">{dept.faculty} faculty members</p>
                   </div>
                   <div className="text-right">
-                    <span className="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full">
+                    <span className="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full font-medium">
                       {dept.faculty}
                     </span>
                   </div>
@@ -224,67 +234,63 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions & Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="card">
+        <div className="card bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 gap-3">
             <button
               onClick={() => navigate('/dashboard/admin/students')}
-              className="w-full inline-flex items-center justify-between bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg transition"
+              className="w-full inline-flex items-center justify-between bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg transition shadow-md shadow-blue-100"
             >
               <div className="flex items-center gap-2">
-                <Plus size={16} />
-                Add Student
+                <Plus size={16} /> Add Student
               </div>
               <ArrowRight size={16} />
             </button>
             <button
               onClick={() => navigate('/dashboard/admin/faculty')}
-              className="w-full inline-flex items-center justify-between bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg transition"
+              className="w-full inline-flex items-center justify-between bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg transition shadow-md shadow-green-100"
             >
               <div className="flex items-center gap-2">
-                <Plus size={16} />
-                Add Faculty
+                <Plus size={16} /> Add Faculty
               </div>
               <ArrowRight size={16} />
             </button>
             <button
               onClick={() => navigate('/dashboard/admin/events')}
-              className="w-full inline-flex items-center justify-between bg-purple-500 hover:bg-purple-600 text-white py-3 px-4 rounded-lg transition"
+              className="w-full inline-flex items-center justify-between bg-purple-500 hover:bg-purple-600 text-white py-3 px-4 rounded-lg transition shadow-md shadow-purple-100"
             >
               <div className="flex items-center gap-2">
-                <Plus size={16} />
-                Add Event
+                <Plus size={16} /> Add Event
               </div>
               <ArrowRight size={16} />
             </button>
             <button
               onClick={() => navigate('/dashboard/admin/research')}
-              className="w-full inline-flex items-center justify-between bg-orange-500 hover:bg-orange-600 text-white py-3 px-4 rounded-lg transition"
+              className="w-full inline-flex items-center justify-between bg-orange-500 hover:bg-orange-600 text-white py-3 px-4 rounded-lg transition shadow-md shadow-orange-100"
             >
               <div className="flex items-center gap-2">
-                <Plus size={16} />
-                Add Research
+                <Plus size={16} /> Add Research
               </div>
               <ArrowRight size={16} />
             </button>
           </div>
         </div>
-        <div className="card">
+
+        <div className="card bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Activity</h2>
           <div className="space-y-3">
             {!students || students.length === 0 ? (
               <div className="text-center py-6">
                 <Users className="mx-auto text-gray-400 mb-2" size={32} />
                 <p className="text-gray-600 text-sm">No students registered yet</p>
-                <p className="text-gray-500 text-xs mt-1">Start by adding your first student</p>
               </div>
             ) : (
               <div className="space-y-2">
                 <p className="text-sm text-gray-600 font-medium">Latest Students:</p>
                 {students.slice(0, 3).map((student) => (
-                  <div key={student.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                  <div key={student.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg border border-gray-100">
                     <div>
                       <p className="font-medium text-gray-800 text-sm">{student.name}</p>
                       <p className="text-xs text-gray-600">{student.program}</p>
@@ -297,17 +303,11 @@ export const AdminDashboard: React.FC = () => {
               </div>
             )}
 
-            {!faculty || faculty.length === 0 ? (
-              <div className="text-center py-6 border-t border-gray-200 mt-4">
-                <Users2 className="mx-auto text-gray-400 mb-2" size={32} />
-                <p className="text-gray-600 text-sm">No faculty added yet</p>
-                <p className="text-gray-500 text-xs mt-1">Add faculty members to get started</p>
-              </div>
-            ) : (
-              <div className="space-y-2 border-t border-gray-200 pt-4">
+            {faculty && faculty.length > 0 && (
+              <div className="space-y-2 border-t border-gray-100 pt-4 mt-4">
                 <p className="text-sm text-gray-600 font-medium">Latest Faculty:</p>
                 {faculty.slice(0, 2).map((fac) => (
-                  <div key={fac.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                  <div key={fac.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg border border-gray-100">
                     <div>
                       <p className="font-medium text-gray-800 text-sm">{fac.name}</p>
                       <p className="text-xs text-gray-600">{fac.department}</p>

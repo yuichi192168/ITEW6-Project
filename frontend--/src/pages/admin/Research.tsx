@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
 import { researchDB } from '../../lib/database';
 import { EmptyState, FormInput } from '../../components/ui/shared';
-import { mockResearch } from '../../lib/constants';
 
 interface ResearchItem {
   id: string;
@@ -13,11 +12,11 @@ interface ResearchItem {
 }
 
 export const AdminResearch: React.FC = () => {
-  const [research, setResearch] = useState<ResearchItem[]>(mockResearch);
+  const [research, setResearch] = useState<ResearchItem[]>([]);
   const [form, setForm] = useState({ title: '', author: '', year: new Date().getFullYear(), status: 'In Progress' as ResearchItem['status'] });
 
   const { data: researchData, loading, error, execute: fetchResearch } = useAsync<ResearchItem[]>(() =>
-    researchDB.getAllResearch().then((data: any) => data as ResearchItem[]).catch(() => mockResearch as ResearchItem[])
+    researchDB.getAllResearch().then((data: any) => data as ResearchItem[])
   );
 
   useEffect(() => {
@@ -118,7 +117,7 @@ export const AdminResearch: React.FC = () => {
       </div>
 
       {loading && <p>Loading research entries...</p>}
-      {error && <p className="text-red-600">Failed to load research entries. Showing local data.</p>}
+      {error && <p className="text-red-600">Failed to load research entries from backend.</p>}
 
       {research.length === 0 ? (
         <EmptyState

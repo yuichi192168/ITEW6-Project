@@ -1,3 +1,7 @@
+<?php
+
+namespace App\Services;
+
 use Google\Cloud\Firestore\FirestoreClient;
 
 class FirestoreService

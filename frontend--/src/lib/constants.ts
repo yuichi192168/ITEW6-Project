@@ -26,6 +26,7 @@ export const menuItems: Record<UserRole, MenuItem[]> = {
     { label: 'Events', path: '/dashboard/student/events', icon: 'CalendarDays' },
     { label: 'Research', path: '/dashboard/student/research', icon: 'FileText' },
     { label: 'Lessons', path: '/dashboard/student/lessons', icon: 'BookOpen' },
+    { label: 'Guidance Counseling', path: '/dashboard/student/guidance-counseling', icon: 'ShieldAlert' },
   ],
   faculty: [
     { label: 'Dashboard', path: '/dashboard/faculty', icon: 'LayoutDashboard' },
@@ -61,9 +62,9 @@ export const mockClasses = [
 
 // Mock data for grades
 export const mockGrades = [
-  { id: '1', studentId: '1', courseCode: 'CS101', grade: 'A', semester: 'Spring 2024' },
-  { id: '2', studentId: '1', courseCode: 'CS102', grade: 'B+', semester: 'Spring 2024' },
-  { id: '3', studentId: '2', courseCode: 'CS101', grade: 'A-', semester: 'Spring 2024' },
+  { id: '1', studentId: '1', courseCode: 'CS101', grade: 'A', semester: 'First Year First Sem' },
+  { id: '2', studentId: '1', courseCode: 'CS102', grade: 'B+', semester: 'First Year Second Sem' },
+  { id: '3', studentId: '2', courseCode: 'CS101', grade: 'A-', semester: 'Second Year First Sem' },
 ];
 
 // Mock data for events

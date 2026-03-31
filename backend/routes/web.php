@@ -12,6 +12,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\DisciplineRecordController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -34,11 +35,19 @@ Route::put('/admin/faculty/{id}/assign-subject', [FacultyController::class, 'ass
 Route::put('/admin/faculty/{id}', [FacultyController::class, 'update']); // Edit profile
 Route::post('/admin/faculty/message-student', [FacultyController::class, 'messageStudent']); // Email/message student
 Route::put('/admin/faculty/{id}/assign-event', [FacultyController::class, 'assignEvent']); // Assign event
+Route::delete('/admin/faculty/{id}', [FacultyController::class, 'destroy']); // Delete faculty
+
+// Faculty REST routes used by frontend
+Route::get('/admin/faculties', [FacultyController::class, 'index']);
+Route::post('/admin/faculties', [FacultyController::class, 'store']);
+Route::put('/admin/faculties/{id}', [FacultyController::class, 'update']);
+Route::delete('/admin/faculties/{id}', [FacultyController::class, 'destroy']);
 
 // Student management routes
 Route::get('/admin/students', [StudentController::class, 'index']); // Filter students
 Route::post('/admin/students', [StudentController::class, 'store']); // Add student
 Route::put('/admin/students/{id}', [StudentController::class, 'update']); // Edit student profile
+Route::delete('/admin/students/{id}', [StudentController::class, 'destroy']); // Delete student
 Route::post('/admin/students/{id}/message', [StudentController::class, 'messageStudent']); // Email/message student
 
 // Scheduling management routes
@@ -64,12 +73,18 @@ Route::get('/admin/users/admins', [UserController::class, 'listAdmins']); // Lis
 Route::get('/admin/users/{id}/activity', [UserController::class, 'activityLog']); // User activity log
 
 // Event management routes
+Route::get('/admin/events', [App\Http\Controllers\EventController::class, 'index']);
 Route::post('/admin/events', [EventController::class, 'store']); // Create event
+Route::put('/admin/events/{id}', [EventController::class, 'update']); // Update event
+Route::delete('/admin/events/{id}', [EventController::class, 'destroy']); // Delete event
 Route::post('/admin/events/{id}/invite-department', [EventController::class, 'inviteDepartment']); // Invite department
 Route::put('/admin/events/{id}/assign-faculties', [EventController::class, 'assignFaculties']); // Assign faculties
 
 // Research management routes
 Route::get('/admin/research', [ResearchController::class, 'index']); // Show all research
+Route::post('/admin/research', [ResearchController::class, 'store']); // Add research
+Route::put('/admin/research/{id}', [ResearchController::class, 'update']); // Update research
+Route::delete('/admin/research/{id}', [ResearchController::class, 'destroy']); // Delete research
 Route::put('/admin/research/{id}/approve', [ResearchController::class, 'approve']); // Approve research
 Route::put('/admin/research/{id}/change-status', [ResearchController::class, 'changeStatus']); // Change status
 Route::put('/admin/research/{id}/assign-panels', [ResearchController::class, 'assignPanels']); // Assign to panels
@@ -82,11 +97,16 @@ Route::get('/admin/courses/{id}', [App\Http\Controllers\CourseController::class,
 Route::put('/admin/courses/{id}', [App\Http\Controllers\CourseController::class, 'update']);
 Route::delete('/admin/courses/{id}', [App\Http\Controllers\CourseController::class, 'destroy']);
 
-// Faculty management GET route
-Route::get('/admin/faculties', [App\Http\Controllers\FacultyController::class, 'index']);
-
-// Event management GET route
-Route::get('/admin/events', [App\Http\Controllers\EventController::class, 'index']);
+// Announcements management routes
+Route::get('/admin/announcements', [AnnouncementController::class, 'index']);
+Route::post('/admin/announcements', [AnnouncementController::class, 'store']);
+Route::get('/admin/announcements/{id}', [AnnouncementController::class, 'show']);
+Route::put('/admin/announcements/{id}', [AnnouncementController::class, 'update']);
+Route::delete('/admin/announcements/{id}', [AnnouncementController::class, 'destroy']);
 
 // Admin Dashboard routes
 Route::get('/admin/dashboard/stats', [AdminDashboardController::class, 'getStats']); // Fetch dashboard statistics
+
+// Student guidance counseling / discipline records
+Route::get('/student/discipline-records', [DisciplineRecordController::class, 'index']);
+Route::post('/admin/discipline-records', [DisciplineRecordController::class, 'store']);

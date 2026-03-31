@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Plus, Edit, Trash2 } from 'lucide-react';
+import { BookOpen, Edit, Trash2 } from 'lucide-react';
 import { Card, SectionHeader, LoadingSpinner, ErrorMessage, SuccessMessage } from '../../components/ui/shared';
 
 interface Subject {
-  id: number;
+  id: string | number;
   name: string;
   code: string;
   description: string;
@@ -36,7 +36,7 @@ export const AdminSubjects: React.FC = () => {
     department: ''
   });
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080';
 
   useEffect(() => {
     fetchSubjects();
@@ -95,7 +95,7 @@ export const AdminSubjects: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (subjectId: number) => {
+  const handleDelete = async (subjectId: string | number) => {
     if (!confirm('Are you sure you want to delete this subject?')) return;
 
     try {

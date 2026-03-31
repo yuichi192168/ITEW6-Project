@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { Award, Calendar, BookOpen, FileText, Bell, Clock, Link as LinkIcon, User, BookMarked, CalendarDays } from 'lucide-react';
+import { Award, Calendar, BookOpen, FileText, Bell, Clock, Link as LinkIcon, User, BookMarked, CalendarDays, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
 import { gradesDB, coursesDB, eventsDB } from '../../lib/database';
@@ -232,6 +232,10 @@ export const StudentDashboard: React.FC = () => {
           <Link to="/dashboard/student/lessons" className="p-3 bg-indigo-50 rounded-lg text-center hover:bg-indigo-100 transition-colors">
             <BookOpen className="mx-auto mb-2 text-indigo-600" size={24} />
             <p className="font-semibold text-indigo-800">Lessons</p>
+          </Link>
+          <Link to="/dashboard/student/guidance-counseling" className="p-3 bg-orange-50 rounded-lg text-center hover:bg-orange-100 transition-colors">
+            <ShieldAlert className="mx-auto mb-2 text-orange-600" size={24} />
+            <p className="font-semibold text-orange-800">Guidance</p>
           </Link>
         </div>
       </div>

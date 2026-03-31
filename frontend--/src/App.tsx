@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
+import { firebaseInitError } from './lib/firebase';
 
 // Admin Pages
 import { AdminDashboard } from './pages/admin/Dashboard';
@@ -23,6 +24,7 @@ import { StudentSchedule } from './pages/student/Schedule';
 import { StudentEvents } from './pages/student/Events';
 import { StudentResearch } from './pages/student/Research';
 import { StudentLessons } from './pages/student/Lessons';
+import { StudentGuidanceCounseling } from './pages/student/GuidanceCounseling';
 
 // Faculty Pages
 import { FacultyDashboard } from './pages/faculty/Dashboard';
@@ -34,6 +36,28 @@ import { FacultyEvents } from './pages/faculty/Events';
 import { FacultyResearch } from './pages/faculty/Research';
 
 export const App: React.FC = () => {
+  if (firebaseInitError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-2xl rounded-3xl border border-orange-200 bg-white p-10 shadow-xl">
+          <h1 className="text-3xl font-bold text-orange-900 mb-4">Firebase configuration required</h1>
+          <p className="text-gray-700 leading-relaxed">
+            The app cannot start because Firebase environment variables are missing or incomplete.
+            Create a <span className="font-semibold">frontend--/.env.local</span> file using the
+            values shown below, then restart the app.
+          </p>
+          <div className="mt-8 rounded-2xl bg-slate-950 p-6 text-slate-100">
+            <p className="text-sm font-medium text-amber-300 mb-4">Required keys:</p>
+            <pre className="text-xs leading-6 whitespace-pre-wrap">{firebaseInitError.message}</pre>
+          </div>
+          <p className="mt-6 text-sm text-gray-500">
+            Use <span className="font-medium">frontend--/.env.example</span> as a template.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <AuthProvider>
@@ -107,6 +131,10 @@ export const App: React.FC = () => {
           <Route
             path="/dashboard/student/lessons"
             element={<ProtectedRoute requiredRole="student"><StudentLessons /></ProtectedRoute>}
+          />
+          <Route
+            path="/dashboard/student/guidance-counseling"
+            element={<ProtectedRoute requiredRole="student"><StudentGuidanceCounseling /></ProtectedRoute>}
           />
 
           {/* Faculty Routes */}

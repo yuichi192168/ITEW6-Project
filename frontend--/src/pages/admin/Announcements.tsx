@@ -6,7 +6,6 @@ import { useSearch } from '../../hooks/useAsync';
 import { usePagination } from '../../hooks/useAsync';
 import { announcementsDB } from '../../lib/database';
 import { LoadingSpinner, ErrorMessage, EmptyState, FormInput, SectionHeader, Pagination, Card } from '../../components/ui/shared';
-import { mockAnnouncements } from '../../lib/constants';
 
 interface Announcement {
   id: string;
@@ -46,13 +45,13 @@ const validationSchema = {
 };
 
 export const AdminAnnouncements: React.FC = () => {
-  const [announcements, setAnnouncements] = useState<Announcement[]>(mockAnnouncements as Announcement[]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
   const [showForm, setShowForm] = useState(false);
 
   const { data: announcementsData, loading, error, execute: fetchAnnouncements } = useAsync<Announcement[]>(() =>
-    announcementsDB.getAllAnnouncements().then((data: any) => data as Announcement[]).catch(() => mockAnnouncements as Announcement[])
+    announcementsDB.getAllAnnouncements().then((data: any) => data as Announcement[])
   );
 
   const { formData, errors, touched, handleChange, handleBlur, reset, setFormData } = useForm<AnnouncementFormData>(
@@ -182,7 +181,7 @@ export const AdminAnnouncements: React.FC = () => {
       />
 
       {loading && <LoadingSpinner fullScreen={false} />}
-      {error && <ErrorMessage message="Failed to load announcements. Showing mock data." />}
+      {error && <ErrorMessage message="Failed to load announcements from backend." />}
 
       {/* Add/Edit Form */}
       {showForm && (

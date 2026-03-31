@@ -6,7 +6,6 @@ import { useSearch } from '../../hooks/useAsync';
 import { usePagination } from '../../hooks/useAsync';
 import { eventsDB } from '../../lib/database';
 import { LoadingSpinner, ErrorMessage, EmptyState, FormInput, SectionHeader, Pagination, Card } from '../../components/ui/shared';
-import { mockEvents } from '../../lib/constants';
 
 interface Event {
   id: string;
@@ -49,14 +48,30 @@ const validationSchema = {
   endTime: (value: string) => value === '' ? 'End time is required' : '',
 };
 
+const validateEventForm = (data: EventFormData): string | null => {
+  const title = data.title.trim();
+  const description = data.description.trim();
+  const location = data.location.trim();
+
+  if (title.length < 3) return 'Title must be at least 3 characters.';
+  if (!data.date) return 'Date is required.';
+  if (description.length < 10) return 'Description must be at least 10 characters.';
+  if (!data.type) return 'Event type is required.';
+  if (!location) return 'Location is required.';
+  if (!data.startTime) return 'Start time is required.';
+  if (!data.endTime) return 'End time is required.';
+  if (data.startTime >= data.endTime) return 'End time must be later than start time.';
+  return null;
+};
+
 export const AdminEvents: React.FC = () => {
-  const [events, setEvents] = useState<Event[]>(mockEvents as Event[]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('All');
   const [showForm, setShowForm] = useState(false);
 
   const { data: eventsData, loading, error, execute: fetchEvents } = useAsync<Event[]>(() =>
-    eventsDB.getAllEvents().then((data: any) => data as Event[]).catch(() => mockEvents as Event[])
+    eventsDB.getAllEvents().then((data: any) => data as Event[])
   );
 
   const { formData, errors, touched, handleChange, handleBlur, reset, setFormData } = useForm<EventFormData>(
@@ -93,28 +108,36 @@ export const AdminEvents: React.FC = () => {
   }, [events]);
 
   const handleAddOrUpdate = async () => {
-    if (Object.values(errors).some(e => e)) {
-      alert('Please fix validation errors');
+    const validationError = validateEventForm(formData);
+    if (validationError) {
+      alert(validationError);
       return;
     }
 
+    const payload: EventFormData = {
+      ...formData,
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      location: formData.location.trim(),
+    };
+
     try {
       if (editingId) {
-        await eventsDB.updateEvent(editingId, formData);
+        await eventsDB.updateEvent(editingId, payload);
         const updated = events.map(e =>
-          e.id === editingId ? { ...e, ...formData } : e
+          e.id === editingId ? { ...e, ...payload } : e
         );
         setEvents(updated);
         setEditingId(null);
         window.dispatchEvent(new Event('eventsUpdated'));
         alert('Event updated successfully!');
       } else {
-        const id = await eventsDB.addEvent({ ...formData });
+        const id = await eventsDB.addEvent({ ...payload });
         const newEvent: Event = {
-          ...formData,
+          ...payload,
           id,
         };
-        setEvents([...events, newEvent]);
+        setEvents(prev => [...prev, newEvent]);
         window.dispatchEvent(new Event('eventsUpdated'));
         alert('Event added successfully!');
       }
@@ -122,7 +145,7 @@ export const AdminEvents: React.FC = () => {
       setShowForm(false);
     } catch (err) {
       console.error('event save error', err);
-      alert('Failed to save event');
+      alert('Failed to save event to backend.');
     }
   };
 
@@ -150,7 +173,7 @@ export const AdminEvents: React.FC = () => {
       alert('Event deleted successfully!');
     } catch (err) {
       console.error('event delete error', err);
-      alert('Failed to delete event');
+      alert('Failed to delete event from backend.');
     }
   };
 
@@ -171,7 +194,7 @@ export const AdminEvents: React.FC = () => {
       />
 
       {loading && <LoadingSpinner fullScreen={false} />}
-      {error && <ErrorMessage message="Failed to load events. Showing mock data." />}
+      {error && <ErrorMessage message="Failed to load events from backend." />}
 
       {/* Add/Edit Form */}
       {showForm && (

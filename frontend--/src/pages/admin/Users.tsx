@@ -3,12 +3,14 @@ import { Settings, Plus, Edit, Trash2, UserCheck, UserX } from 'lucide-react';
 import { Card, SectionHeader, LoadingSpinner, ErrorMessage, SuccessMessage, Badge } from '../../components/ui/shared';
 
 interface User {
-  id: number;
+  id: string | number;
   name: string;
   email: string;
   role: 'admin' | 'faculty' | 'student';
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface UserFormData {
@@ -32,7 +34,7 @@ export const AdminUsers: React.FC = () => {
     role: 'student'
   });
 
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080';
 
   useEffect(() => {
     fetchUsers();
@@ -90,7 +92,7 @@ export const AdminUsers: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (userId: number) => {
+  const handleDelete = async (userId: string | number) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
@@ -114,6 +116,13 @@ export const AdminUsers: React.FC = () => {
       password: '',
       role: 'student'
     });
+  };
+
+  const getCreatedDate = (user: User) => {
+    const rawDate = user.created_at || user.createdAt;
+    if (!rawDate) return 'N/A';
+    const parsed = new Date(rawDate);
+    return Number.isNaN(parsed.getTime()) ? 'N/A' : parsed.toLocaleDateString();
   };
 
   const getRoleBadgeVariant = (role: string) => {
@@ -240,7 +249,7 @@ export const AdminUsers: React.FC = () => {
                     <Badge label={user.role} variant={getRoleBadgeVariant(user.role)} />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.created_at).toLocaleDateString()}
+                    {getCreatedDate(user)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex gap-2">

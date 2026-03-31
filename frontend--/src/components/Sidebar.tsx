@@ -29,6 +29,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       User: Icons.User,
       BookMarked: Icons.BookMarked,
       Briefcase: Icons.Briefcase,
+      ShieldAlert: Icons.ShieldAlert,
+      ClipboardList: Icons.ClipboardList,
+      Bell: Icons.Bell,
     };
     const Icon = iconMap[iconName];
     return Icon ? <Icon size={20} /> : null;

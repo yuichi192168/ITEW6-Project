@@ -6,10 +6,9 @@ import { useSearch } from '../../hooks/useAsync';
 import { usePagination } from '../../hooks/useAsync';
 import { facultyDB } from '../../lib/database';
 import { LoadingSpinner, ErrorMessage, EmptyState, FormInput, SectionHeader, Pagination, Card } from '../../components/ui/shared';
-import { mockFaculty } from '../../lib/constants';
 
 interface Faculty {
-  id: string;
+  id: string | number;
   name: string;
   email: string;
   department: string;
@@ -49,14 +48,16 @@ const validationSchema = {
   qualifications: (value: string) => value.trim().length === 0 ? 'Qualifications are required' : '',
 };
 
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 export const AdminFaculty: React.FC = () => {
-  const [faculty, setFaculty] = useState<Faculty[]>(mockFaculty as Faculty[]);
+  const [faculty, setFaculty] = useState<Faculty[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [departmentFilter, setDepartmentFilter] = useState<string>('All');
   const [showForm, setShowForm] = useState(false);
 
   const { data: facultyData, loading, error, execute: fetchFaculty } = useAsync<Faculty[]>(() =>
-    facultyDB.getAllFaculty().then((data: any) => data as Faculty[]).catch(() => mockFaculty as Faculty[])
+    facultyDB.getAllFaculty().then((data: any) => data as Faculty[])
   );
 
   const { formData, errors, touched, handleChange, handleBlur, reset, setFormData } = useForm<FacultyFormData>(
@@ -93,36 +94,59 @@ export const AdminFaculty: React.FC = () => {
   }, [faculty]);
 
   const handleAddOrUpdate = async () => {
-    if (Object.values(errors).some(e => e)) {
-      alert('Please fix validation errors');
+    const cleaned = {
+      name: formData.name.trim(),
+      email: formData.email.trim().toLowerCase(),
+      department: formData.department.trim(),
+      specialization: formData.specialization.trim(),
+      phone: formData.phone.trim(),
+      office: formData.office.trim(),
+      qualifications: formData.qualifications.trim(),
+    };
+
+    if (
+      !cleaned.name ||
+      !cleaned.email ||
+      !cleaned.department ||
+      !cleaned.specialization ||
+      !cleaned.phone ||
+      !cleaned.office ||
+      !cleaned.qualifications
+    ) {
+      alert('Please complete all required faculty fields.');
+      return;
+    }
+
+    if (!isValidEmail(cleaned.email)) {
+      alert('Please enter a valid email address.');
       return;
     }
 
     try {
       if (editingId) {
-        await facultyDB.updateFaculty(editingId, formData);
+        await facultyDB.updateFaculty(String(editingId), cleaned);
         const updated = faculty.map(f =>
-          f.id === editingId ? { ...f, ...formData } : f
+          String(f.id) === String(editingId) ? { ...f, ...cleaned } : f
         );
         setFaculty(updated);
         setEditingId(null);
         window.dispatchEvent(new Event('facultyUpdated'));
         alert('Faculty updated successfully!');
       } else {
-        const id = await facultyDB.addFaculty({ ...formData });
+        const id = await facultyDB.addFaculty({ ...cleaned });
         const newFaculty: Faculty = {
-          ...formData,
+          ...cleaned,
           id,
         };
-        setFaculty([...faculty, newFaculty]);
+        setFaculty(prev => [...prev, newFaculty]);
         window.dispatchEvent(new Event('facultyUpdated'));
         alert('Faculty added successfully!');
       }
       reset();
       setShowForm(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('faculty save error', err);
-      alert('Failed to save faculty');
+      alert(err?.message || 'Failed to save faculty');
     }
   };
 
@@ -140,17 +164,17 @@ export const AdminFaculty: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string | number) => {
     if (!confirm('Are you sure you want to delete this faculty member?')) return;
 
     try {
-      await facultyDB.deleteFaculty(id);
-      setFaculty(faculty.filter(f => f.id !== id));
+      await facultyDB.deleteFaculty(String(id));
+      setFaculty(faculty.filter(f => String(f.id) !== String(id)));
       window.dispatchEvent(new Event('facultyUpdated'));
       alert('Faculty deleted successfully!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('faculty delete error', err);
-      alert('Failed to delete faculty');
+      alert(err?.message || 'Failed to delete faculty');
     }
   };
 
@@ -171,7 +195,7 @@ export const AdminFaculty: React.FC = () => {
       />
 
       {loading && <LoadingSpinner fullScreen={false} />}
-      {error && <ErrorMessage message="Failed to load faculty. Showing mock data." />}
+      {error && <ErrorMessage message="Failed to load faculty from backend." />}
 
       {/* Add/Edit Form */}
       {showForm && (

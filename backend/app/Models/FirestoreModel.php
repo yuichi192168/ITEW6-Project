@@ -64,7 +64,7 @@ abstract class FirestoreModel extends Model
             
             // Use the model's ID as the document ID
             self::firestore()->updateDocument($collection, (string)$this->id, $data);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Log::error("Failed to sync to Firestore: " . $e->getMessage());
         }
     }
@@ -77,7 +77,7 @@ abstract class FirestoreModel extends Model
         try {
             $collection = static::getFirestoreCollection();
             self::firestore()->deleteDocument($collection, (string)$this->id);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Log::error("Failed to delete from Firestore: " . $e->getMessage());
         }
     }
@@ -93,7 +93,7 @@ abstract class FirestoreModel extends Model
         foreach (static::all() as $model) {
             try {
                 $firestore->updateDocument($collection, (string)$model->id, $model->toArray());
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 \Log::error("Failed to sync {$model->id} to Firestore: " . $e->getMessage());
             }
         }

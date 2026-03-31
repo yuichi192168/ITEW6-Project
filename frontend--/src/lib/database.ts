@@ -1,6 +1,35 @@
 import { DocumentData } from 'firebase/firestore';
 
-const API_BASE = 'http://localhost:8000'; 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080';
+
+const getErrorMessage = async (response: Response, fallback: string) => {
+  try {
+    const payload = await response.json();
+    if (payload?.message) return payload.message as string;
+    if (payload?.errors && typeof payload.errors === 'object') {
+      const firstKey = Object.keys(payload.errors)[0];
+      if (firstKey && Array.isArray(payload.errors[firstKey]) && payload.errors[firstKey][0]) {
+        return payload.errors[firstKey][0] as string;
+      }
+    }
+  } catch (_error) {
+    // ignore parse errors and use fallback
+  }
+  return fallback;
+};
+
+const normalizeCollectionResponse = <T>(payload: unknown): T[] => {
+  if (Array.isArray(payload)) return payload as T[];
+  if (payload && typeof payload === 'object') {
+    return Object.entries(payload as Record<string, unknown>).map(([id, value]) => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return { id, ...(value as Record<string, unknown>) } as T;
+      }
+      return { id, value } as T;
+    });
+  }
+  return [];
+};
 /**
  * Generic function to get a single document by ID
  */
@@ -10,7 +39,7 @@ export const getDocument = async <T extends DocumentData>(
 ): Promise<T | null> => {
   try {
     const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`);
-    if (!response.ok) throw new Error('Failed to fetch document');
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to fetch document'));
     return await response.json();
   } catch (error) {
     console.error(`Error fetching document from ${collectionName}:`, error);
@@ -26,8 +55,9 @@ export const getCollection = async <T extends DocumentData>(
 ): Promise<T[]> => {
   try {
     const response = await fetch(`${API_BASE}/admin/${collectionName}`);
-    if (!response.ok) throw new Error('Failed to fetch collection');
-    return await response.json();
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to fetch collection'));
+    const payload = await response.json();
+    return normalizeCollectionResponse<T>(payload);
   } catch (error) {
     console.error(`Error fetching collection ${collectionName}:`, error);
     throw error;
@@ -44,10 +74,10 @@ export const addDocument = async <T extends DocumentData>(
   try {
     const response = await fetch(`${API_BASE}/admin/${collectionName}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to add document');
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to add document'));
     const result = await response.json();
     return result.id;
   } catch (error) {
@@ -67,10 +97,10 @@ export const updateDocument = async <T extends DocumentData>(
   try {
     const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update document');
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to update document'));
   } catch (error) {
     console.error(`Error updating document in ${collectionName}:`, error);
     throw error;
@@ -88,7 +118,7 @@ export const deleteDocument = async (
     const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`, {
       method: 'DELETE',
     });
-    if (!response.ok) throw new Error('Failed to delete document');
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to delete document'));
   } catch (error) {
     console.error(`Error deleting document from ${collectionName}:`, error);
     throw error;
@@ -112,8 +142,9 @@ export const queryCollection = async <T extends DocumentData>(
     const queryString = params.toString();
     const url = `${API_BASE}/admin/${collectionName}${queryString ? '?' + queryString : ''}`;
     const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to query collection');
-    return await response.json();
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to query collection'));
+    const payload = await response.json();
+    return normalizeCollectionResponse<T>(payload);
   } catch (error) {
     console.error(`Error querying collection ${collectionName}:`, error);
     throw error;
@@ -246,12 +277,12 @@ export const studentDB = {
  * Faculty-specific operations
  */
 export const facultyDB = {
-  getFaculty: (facultyId: string) => getDocument('faculty', facultyId),
-  getAllFaculty: () => getCollection('faculty'),
-  addFaculty: (data: any) => addDocument('faculty', data),
+  getFaculty: (facultyId: string) => getDocument('faculties', facultyId),
+  getAllFaculty: () => getCollection('faculties'),
+  addFaculty: (data: any) => addDocument('faculties', data),
   updateFaculty: (facultyId: string, data: any) =>
-    updateDocument('faculty', facultyId, data),
-  deleteFaculty: (facultyId: string) => deleteDocument('faculty', facultyId),
+    updateDocument('faculties', facultyId, data),
+  deleteFaculty: (facultyId: string) => deleteDocument('faculties', facultyId),
 };
 
 /**
@@ -294,6 +325,20 @@ export const gradesDB = {
   deleteGrade: (gradeId: string) => deleteDocument('grades', gradeId),
 };
 
+export const schedulesDB = {
+  getSchedule: (scheduleId: string) => getDocument('schedules', scheduleId),
+  getAllSchedules: () => getCollection('schedules'),
+  addSchedule: (data: any) => addDocument('schedules', data),
+  updateSchedule: (scheduleId: string, data: any) => updateDocument('schedules', scheduleId, data),
+  deleteSchedule: (scheduleId: string) => deleteDocument('schedules', scheduleId),
+  reassignFaculty: (scheduleId: string, facultyId: string) =>
+    fetch(`${API_BASE}/admin/schedules/${scheduleId}/reassign`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ faculty_id: facultyId }),
+    }),
+};
+
 /**
  * Events operations
  */
@@ -327,4 +372,18 @@ export const announcementsDB = {
     updateDocument('announcements', announcementId, data),
   deleteAnnouncement: (announcementId: string) =>
     deleteDocument('announcements', announcementId),
+};
+
+/** Guidance counseling / discipline records operations */
+export const guidanceDB = {
+  getStudentDisciplineRecords: async (studentId?: string, email?: string) => {
+    const params = new URLSearchParams();
+    if (studentId) params.append('studentId', studentId);
+    if (email) params.append('email', email);
+
+    const url = `${API_BASE}/student/discipline-records${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch discipline records');
+    return await response.json();
+  },
 };

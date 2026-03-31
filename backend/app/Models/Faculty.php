@@ -12,6 +12,6 @@ class Faculty extends FirestoreModel
 
     protected static function getFirestoreCollection(): string
     {
-        return 'faculty';
+        return 'faculties';
     }
 }

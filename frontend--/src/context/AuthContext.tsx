@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
+import {
   User as FirebaseUser,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
 } from 'firebase/auth';
-import { auth, db } from '../lib/firebase';
+import { auth, db, firebaseInitError } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'student' | 'faculty';
@@ -18,6 +18,8 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  year?: string;
+  yearLevel?: string | number;
   photoURL?: string;
   phone?: string;
   address?: string;
@@ -44,7 +46,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Set persistence to local storage
   useEffect(() => {
-    setPersistence(auth, browserLocalPersistence).catch((err) => {
+    if (firebaseInitError) {
+      console.error(firebaseInitError);
+      setError(firebaseInitError.message);
+      setIsLoading(false);
+      return;
+    }
+
+    setPersistence(auth!, browserLocalPersistence).catch((err) => {
       console.error('Error setting persistence:', err);
     });
   }, []);
@@ -58,7 +67,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Listen for auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    if (firebaseInitError) {
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth!, (currentUser) => {
       try {
         if (currentUser) {
           setFirebaseUser(currentUser);
@@ -102,10 +115,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<void> => {
     try {
       setError(null);
-      const result = await signInWithEmailAndPassword(auth, email, password);
+      if (firebaseInitError) {
+        throw firebaseInitError;
+      }
+
+      const result = await signInWithEmailAndPassword(auth!, email, password);
       
       // Fetch user data from Firestore
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      const userDoc = await getDoc(doc(db!, 'users', result.user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data() as User;
         setUser(userData);
@@ -125,7 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<void> => {
     try {
       setError(null);
-      const result = await createUserWithEmailAndPassword(auth, email, password);
+      if (firebaseInitError) {
+        throw firebaseInitError;
+      }
+
+      const result = await createUserWithEmailAndPassword(auth!, email, password);
       
       // Create user document in Firestore
       const newUser: User = {
@@ -135,7 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role,
       };
       
-      await setDoc(doc(db, 'users', result.user.uid), newUser);
+      await setDoc(doc(db!, 'users', result.user.uid), newUser);
       setUser(newUser);
     } catch (err: any) {
       const errorMessage = err.message || 'Signup failed';
@@ -147,7 +168,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async (): Promise<void> => {
     try {
       setError(null);
-      await firebaseSignOut(auth);
+      if (firebaseInitError) {
+        throw firebaseInitError;
+      }
+
+      await firebaseSignOut(auth!);
       setUser(null);
       setFirebaseUser(null);
     } catch (err: any) {
