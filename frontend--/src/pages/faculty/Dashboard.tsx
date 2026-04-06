@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Users, BarChart3, BookOpen, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
-import { coursesDB } from '../../lib/database';
+import { announcementsDB, coursesDB, eventsDB, researchDB } from '../../lib/database';
 import { ErrorMessage, EmptyState } from '../../components/ui/shared';
-import { mockClasses } from '../../lib/constants';
+import { mockClasses, mockResearch } from '../../lib/constants';
 
 interface Course {
   id: string;
@@ -16,23 +16,80 @@ interface Course {
   schedule?: string;
 }
 
+interface Event {
+  id: string;
+  title: string;
+  date: string;
+  type: string;
+  description: string;
+}
+
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  admin: string;
+}
+
+interface ResearchItem {
+  id: string;
+  title: string;
+  author: string;
+  year: number;
+  status: string;
+}
+
 export const FacultyDashboard: React.FC = () => {
   const { user } = useAuth();
 
-  const { data: classes, error, execute: fetchClasses } = useAsync<Course[]>(() =>
+  const { data: classes, error: classesError, execute: fetchClasses } = useAsync<Course[]>(() =>
     coursesDB.getAllCourses().then((data: any) => (data as Course[])).catch(() => mockClasses as Course[])
+  );
+
+  const { data: events, error: eventsError, execute: fetchEvents } = useAsync<Event[]>(() =>
+    eventsDB.getAllEvents().then((data: any) => (data as Event[])).catch(() => [] as Event[])
+  );
+
+  const { data: announcements, error: announcementsError, execute: fetchAnnouncements } = useAsync<Announcement[]>(() =>
+    announcementsDB.getAllAnnouncements().then((data: any) => data as Announcement[]).catch(() => [] as Announcement[])
+  );
+
+  const { data: research, error: researchError, execute: fetchResearch } = useAsync<ResearchItem[]>(() =>
+    researchDB.getAllResearch().then((data: any) => data as ResearchItem[]).catch(() => (mockResearch as unknown as ResearchItem[]))
   );
 
   useEffect(() => {
     if (user?.id) {
       fetchClasses();
+      fetchEvents();
+      fetchAnnouncements();
+      fetchResearch();
     }
-  }, [user?.id, fetchClasses]);
+  }, [user?.id, fetchClasses, fetchEvents, fetchAnnouncements, fetchResearch]);
+
+  useEffect(() => {
+    const refreshFacultyData = () => {
+      fetchAnnouncements();
+      fetchEvents();
+      fetchResearch();
+    };
+
+    window.addEventListener('announcementsUpdated', refreshFacultyData);
+    window.addEventListener('eventsUpdated', refreshFacultyData);
+    window.addEventListener('researchUpdated', refreshFacultyData);
+
+    return () => {
+      window.removeEventListener('announcementsUpdated', refreshFacultyData);
+      window.removeEventListener('eventsUpdated', refreshFacultyData);
+      window.removeEventListener('researchUpdated', refreshFacultyData);
+    };
+  }, [fetchAnnouncements, fetchEvents, fetchResearch]);
 
   const totalStudents = classes?.reduce((sum, c) => sum + (c.students || 0), 0) || 0;
   const courseCount = classes?.length || 0;
   const courseMaterials = 12; // TODO: Fetch from materials collection
-  const researchPapers = 5; // TODO: Fetch from research collection
+  const researchPapers = research?.length ?? (researchError ? mockResearch.length : 0);
 
   const stats = [
     { label: 'Classes Teaching', value: courseCount, icon: Users, color: 'bg-blue-500' },
@@ -48,7 +105,7 @@ export const FacultyDashboard: React.FC = () => {
         <p className="text-gray-600 mt-2">Welcome {user?.name}! Here's your teaching portal</p>
       </div>
 
-      {error && <ErrorMessage message="Failed to load classes. Using fallback data." />}
+      {(classesError || eventsError || announcementsError || researchError) && <ErrorMessage message="Some data failed to load. Using fallback data." />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat) => {
