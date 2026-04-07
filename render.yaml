@@ -6,6 +6,16 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
+  - type: static_site
+    name: itew6-frontend
+    rootDir: frontend--
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://itew6-project-1lhh.onrender.com
