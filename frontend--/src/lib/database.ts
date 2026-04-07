@@ -1,35 +1,28 @@
-import { DocumentData } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore';
+import type { DocumentData, QueryConstraint, WhereFilterOp } from 'firebase/firestore';
+import { db } from './firebase';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080';
-
-const getErrorMessage = async (response: Response, fallback: string) => {
-  try {
-    const payload = await response.json();
-    if (payload?.message) return payload.message as string;
-    if (payload?.errors && typeof payload.errors === 'object') {
-      const firstKey = Object.keys(payload.errors)[0];
-      if (firstKey && Array.isArray(payload.errors[firstKey]) && payload.errors[firstKey][0]) {
-        return payload.errors[firstKey][0] as string;
-      }
-    }
-  } catch (_error) {
-    // ignore parse errors and use fallback
+const getDb = () => {
+  if (!db) {
+    throw new Error('Firebase is not initialized. Check frontend environment variables.');
   }
-  return fallback;
+  return db;
 };
 
-const normalizeCollectionResponse = <T>(payload: unknown): T[] => {
-  if (Array.isArray(payload)) return payload as T[];
-  if (payload && typeof payload === 'object') {
-    return Object.entries(payload as Record<string, unknown>).map(([id, value]) => {
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        return { id, ...(value as Record<string, unknown>) } as T;
-      }
-      return { id, value } as T;
-    });
-  }
-  return [];
-};
+const withId = <T extends DocumentData>(id: string, data: DocumentData): T =>
+  ({ id, ...data } as T);
+
+const normalizeAdminRole = (role: unknown) => String(role ?? '').toLowerCase();
 /**
  * Generic function to get a single document by ID
  */
@@ -38,9 +31,10 @@ export const getDocument = async <T extends DocumentData>(
   docId: string
 ): Promise<T | null> => {
   try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`);
-    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to fetch document'));
-    return await response.json();
+    const dbInstance = getDb();
+    const snapshot = await getDoc(doc(dbInstance, collectionName, docId));
+    if (!snapshot.exists()) return null;
+    return withId<T>(snapshot.id, snapshot.data());
   } catch (error) {
     console.error(`Error fetching document from ${collectionName}:`, error);
     throw error;
@@ -54,10 +48,9 @@ export const getCollection = async <T extends DocumentData>(
   collectionName: string
 ): Promise<T[]> => {
   try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}`);
-    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to fetch collection'));
-    const payload = await response.json();
-    return normalizeCollectionResponse<T>(payload);
+    const dbInstance = getDb();
+    const snapshots = await getDocs(collection(dbInstance, collectionName));
+    return snapshots.docs.map((snapshot) => withId<T>(snapshot.id, snapshot.data()));
   } catch (error) {
     console.error(`Error fetching collection ${collectionName}:`, error);
     throw error;
@@ -72,14 +65,9 @@ export const addDocument = async <T extends DocumentData>(
   data: T
 ): Promise<string> => {
   try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to add document'));
-    const result = await response.json();
-    return result.id;
+    const dbInstance = getDb();
+    const reference = await addDoc(collection(dbInstance, collectionName), data);
+    return reference.id;
   } catch (error) {
     console.error(`Error adding document to ${collectionName}:`, error);
     throw error;
@@ -95,12 +83,8 @@ export const updateDocument = async <T extends DocumentData>(
   data: Partial<T>
 ): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to update document'));
+    const dbInstance = getDb();
+    await setDoc(doc(dbInstance, collectionName, docId), data, { merge: true });
   } catch (error) {
     console.error(`Error updating document in ${collectionName}:`, error);
     throw error;
@@ -115,10 +99,8 @@ export const deleteDocument = async (
   docId: string
 ): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to delete document'));
+    const dbInstance = getDb();
+    await deleteDoc(doc(dbInstance, collectionName, docId));
   } catch (error) {
     console.error(`Error deleting document from ${collectionName}:`, error);
     throw error;
@@ -133,18 +115,12 @@ export const queryCollection = async <T extends DocumentData>(
   conditions: Array<[string, string, any]>
 ): Promise<T[]> => {
   try {
-    const params = new URLSearchParams();
-    conditions.forEach(([field, operator, value]) => {
-      if (operator === '==') {
-        params.append(field, value);
-      }
-    });
-    const queryString = params.toString();
-    const url = `${API_BASE}/admin/${collectionName}${queryString ? '?' + queryString : ''}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to query collection'));
-    const payload = await response.json();
-    return normalizeCollectionResponse<T>(payload);
+    const dbInstance = getDb();
+    const constraints: QueryConstraint[] = conditions.map(([field, operator, value]) =>
+      where(field, operator as WhereFilterOp, value)
+    );
+    const snapshots = await getDocs(query(collection(dbInstance, collectionName), ...constraints));
+    return snapshots.docs.map((snapshot) => withId<T>(snapshot.id, snapshot.data()));
   } catch (error) {
     console.error(`Error querying collection ${collectionName}:`, error);
     throw error;
@@ -160,12 +136,8 @@ export const setDocument = async <T extends DocumentData>(
   data: T
 ): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error('Failed to set document');
+    const dbInstance = getDb();
+    await setDoc(doc(dbInstance, collectionName, docId), data, { merge: true });
   } catch (error) {
     console.error(`Error setting document in ${collectionName}:`, error);
     throw error;
@@ -181,12 +153,8 @@ export const updateDocumentFields = async <T extends Partial<DocumentData>>(
   data: T
 ): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error('Failed to update document');
+    const dbInstance = getDb();
+    await setDoc(doc(dbInstance, collectionName, docId), data, { merge: true });
   } catch (error) {
     console.error(`Error updating document in ${collectionName}:`, error);
     throw error;
@@ -200,15 +168,7 @@ export const deleteDocumentOld = async (
   collectionName: string,
   docId: string
 ): Promise<void> => {
-  try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}/${docId}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) throw new Error('Failed to delete document');
-  } catch (error) {
-    console.error(`Error deleting document from ${collectionName}:`, error);
-    throw error;
-  }
+  return deleteDocument(collectionName, docId);
 };
 
 /**
@@ -218,19 +178,7 @@ export const addDocumentOld = async <T extends DocumentData>(
   collectionName: string,
   data: T
 ): Promise<string> => {
-  try {
-    const response = await fetch(`${API_BASE}/admin/${collectionName}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error('Failed to add document');
-    const result = await response.json();
-    return result.id;
-  } catch (error) {
-    console.error(`Error adding document to ${collectionName}:`, error);
-    throw error;
-  }
+  return addDocument(collectionName, data);
 };
 
 /**
@@ -244,12 +192,14 @@ export const batchWrite = async (
     data?: DocumentData;
   }>
 ): Promise<void> => {
-  // For simplicity, perform operations sequentially
+  const dbInstance = getDb();
+
+  // For simplicity, perform operations sequentially.
   for (const op of operations) {
     if (op.type === 'set' || op.type === 'update') {
-      await updateDocument(op.collection, op.docId, op.data || {});
+      await setDoc(doc(dbInstance, op.collection, op.docId), op.data || {}, { merge: true });
     } else if (op.type === 'delete') {
-      await deleteDocument(op.collection, op.docId);
+      await deleteDoc(doc(dbInstance, op.collection, op.docId));
     }
   }
 };
@@ -282,33 +232,32 @@ export const facultyDB = {
   updateFaculty: (facultyId: string, data: any) =>
     updateDocument('faculties', facultyId, data),
   deleteFaculty: (facultyId: string) => deleteDocument('faculties', facultyId),
-  assignSubject: (facultyId: string, subject: string) =>
-    fetch(`${API_BASE}/admin/faculty/${facultyId}/assign-subject`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ subject }),
-    }).then(async (response) => {
-      if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to assign subject'));
-      return response.json();
-    }),
-  assignEvent: (facultyId: string, eventId: string) =>
-    fetch(`${API_BASE}/admin/faculty/${facultyId}/assign-event`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ event_id: eventId }),
-    }).then(async (response) => {
-      if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to assign event'));
-      return response.json();
-    }),
-  messageStudent: (payload: any) =>
-    fetch(`${API_BASE}/admin/faculty/message-student`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(payload),
-    }).then(async (response) => {
-      if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to send message'));
-      return response.json();
-    }),
+  assignSubject: async (facultyId: string, subject: string) => {
+    await updateDocument('faculties', facultyId, {
+      subject,
+      assigned_subject: subject,
+      specialization: subject,
+    });
+    return getDocument('faculties', facultyId);
+  },
+  assignEvent: async (facultyId: string, eventId: string) => {
+    const current = await getDocument<DocumentData>('faculties', facultyId);
+    const existingIds = Array.isArray(current?.event_ids) ? current.event_ids : [];
+    const nextEventIds = Array.from(new Set([...existingIds, eventId]));
+
+    await updateDocument('faculties', facultyId, {
+      event_id: eventId,
+      eventId,
+      event_ids: nextEventIds,
+    });
+
+    return getDocument('faculties', facultyId);
+  },
+  messageStudent: async (payload: any) => {
+    const created_at = new Date().toISOString();
+    const id = await addDocument('messages', { ...payload, created_at });
+    return { id, ...payload, created_at };
+  },
 };
 
 /**
@@ -317,9 +266,8 @@ export const facultyDB = {
 export const adminDB = {
   getAdmin: (adminId: string) => getDocument('users', adminId),
   getAllAdmins: async () => {
-    const response = await fetch(`${API_BASE}/admin/users/admins`);
-    if (!response.ok) throw new Error('Failed to fetch admins');
-    return await response.json();
+    const users = await getCollection<DocumentData>('users');
+    return users.filter((user) => normalizeAdminRole(user.role) === 'admin');
   },
   updateAdmin: (adminId: string, data: any) =>
     updateDocument('users', adminId, data),
@@ -358,11 +306,7 @@ export const schedulesDB = {
   updateSchedule: (scheduleId: string, data: any) => updateDocument('schedules', scheduleId, data),
   deleteSchedule: (scheduleId: string) => deleteDocument('schedules', scheduleId),
   reassignFaculty: (scheduleId: string, facultyId: string) =>
-    fetch(`${API_BASE}/admin/schedules/${scheduleId}/reassign`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ faculty_id: facultyId }),
-    }),
+    updateDocument('schedules', scheduleId, { faculty_id: facultyId, facultyId }),
 };
 
 /**
@@ -403,13 +347,17 @@ export const announcementsDB = {
 /** Guidance counseling / discipline records operations */
 export const guidanceDB = {
   getStudentDisciplineRecords: async (studentId?: string, email?: string) => {
-    const params = new URLSearchParams();
-    if (studentId) params.append('studentId', studentId);
-    if (email) params.append('email', email);
+    const dbInstance = getDb();
+    const constraints: QueryConstraint[] = [];
 
-    const url = `${API_BASE}/student/discipline-records${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to fetch discipline records');
-    return await response.json();
+    if (studentId) constraints.push(where('studentId', '==', studentId));
+    if (email) constraints.push(where('email', '==', email));
+
+    const recordsQuery = constraints.length
+      ? query(collection(dbInstance, 'disciplineRecords'), ...constraints)
+      : collection(dbInstance, 'disciplineRecords');
+    const snapshots = await getDocs(recordsQuery);
+
+    return snapshots.docs.map((snapshot) => withId(snapshot.id, snapshot.data()));
   },
 };
