@@ -1,25 +1,8 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Award, Calendar, BookOpen, FileText, Bell, Clock, Link as LinkIcon, User, BookMarked, CalendarDays, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useAsync } from '../../hooks/useAsync';
-import { announcementsDB, gradesDB, coursesDB, eventsDB, researchDB } from '../../lib/database';
 import { ErrorMessage, EmptyState } from '../../components/ui/shared';
-import { mockAnnouncements, mockEvents, mockActivities, mockResearch } from '../../lib/constants';
 import { Link } from 'react-router-dom';
-
-interface Grade {
-  id: string;
-  course: string;
-  grade: string;
-  score: number;
-}
-
-interface Course {
-  id: string;
-  name: string;
-  code: string;
-  semester: string;
-}
 
 interface Event {
   id: string;
@@ -47,42 +30,71 @@ interface ResearchItem {
 
 export const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
-
-  const { data: grades, error: gradesError, execute: fetchGrades } = useAsync<Grade[]>(() =>
-    gradesDB.getAllGrades().then((data: any) => (data as Grade[])).catch(() => [] as Grade[])
-  );
-
-  const { data: courses, error: coursesError, execute: fetchCourses } = useAsync<Course[]>(() =>
-    coursesDB.getAllCourses().then((data: any) => (data as Course[])).catch(() => [] as Course[])
-  );
-
-  const { data: events, error: eventsError, execute: fetchEvents } = useAsync<Event[]>(() =>
-    eventsDB.getAllEvents().then((data: any) => (data as Event[])).catch(() => (mockEvents as unknown as Event[]))
-  );
-
-  const { data: announcements, error: announcementsError, execute: fetchAnnouncements } = useAsync<Announcement[]>(() =>
-    announcementsDB.getAllAnnouncements().then((data: any) => data as Announcement[]).catch(() => (mockAnnouncements as unknown as Announcement[]))
-  );
-
-  const { data: research, error: researchError, execute: fetchResearch } = useAsync<ResearchItem[]>(() =>
-    researchDB.getAllResearch().then((data: any) => data as ResearchItem[]).catch(() => (mockResearch as unknown as ResearchItem[]))
-  );
+  const [gradesSummary, setGradesSummary] = useState<{ gwa: number; totalCourses: number; grades: any[] } | null>(null);
+  const [scheduleData, setScheduleData] = useState<{ enrolledClasses: any[]; totalCourses: number } | null>(null);
+  const [eventsList, setEventsList] = useState<Event[]>([]);
+  const [researchList, setResearchList] = useState<ResearchItem[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchGrades();
-      fetchCourses();
-      fetchEvents();
-      fetchAnnouncements();
-      fetchResearch();
-    }
-  }, [user?.id, fetchGrades, fetchCourses, fetchEvents, fetchAnnouncements, fetchResearch]);
+    if (!user?.id) return;
+
+    const fetchData = async () => {
+      setError(null);
+
+      try {
+        const [gradesRes, scheduleRes, eventsRes, researchRes, announcementsRes] = await Promise.all([
+          fetch(`http://localhost:8080/student/${user.id}/grades`),
+          fetch(`http://localhost:8080/student/${user.id}/schedule`),
+          fetch(`http://localhost:8080/student/${user.id}/events`),
+          fetch(`http://localhost:8080/student/${user.id}/research`),
+          fetch('http://localhost:8080/admin/announcements'),
+        ]);
+
+        if (!gradesRes.ok) throw new Error('Failed to load grades');
+        if (!scheduleRes.ok) throw new Error('Failed to load schedule');
+        if (!eventsRes.ok) throw new Error('Failed to load events');
+        if (!researchRes.ok) throw new Error('Failed to load research');
+        if (!announcementsRes.ok) throw new Error('Failed to load announcements');
+
+        const gradesJson = await gradesRes.json();
+        const scheduleJson = await scheduleRes.json();
+        const eventsJson = await eventsRes.json();
+        const researchJson = await researchRes.json();
+        const announcementsJson = await announcementsRes.json();
+
+        setGradesSummary(gradesJson);
+        setScheduleData(scheduleJson);
+        setEventsList(eventsJson);
+        setResearchList(researchJson);
+        setAnnouncements(announcementsJson);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load student data');
+      } finally {
+      }
+    };
+
+    fetchData();
+  }, [user?.id]);
 
   useEffect(() => {
-    const refreshStudentData = () => {
-      fetchAnnouncements();
-      fetchEvents();
-      fetchResearch();
+    if (!user?.id) return;
+
+    const refreshStudentData = async () => {
+      try {
+        const [eventsRes, researchRes, announcementsRes] = await Promise.all([
+          fetch(`http://localhost:8080/student/${user.id}/events`),
+          fetch(`http://localhost:8080/student/${user.id}/research`),
+          fetch('http://localhost:8080/admin/announcements'),
+        ]);
+
+        if (eventsRes.ok) setEventsList(await eventsRes.json());
+        if (researchRes.ok) setResearchList(await researchRes.json());
+        if (announcementsRes.ok) setAnnouncements(await announcementsRes.json());
+      } catch {
+        // ignore refresh errors
+      }
     };
 
     window.addEventListener('announcementsUpdated', refreshStudentData);
@@ -94,34 +106,23 @@ export const StudentDashboard: React.FC = () => {
       window.removeEventListener('eventsUpdated', refreshStudentData);
       window.removeEventListener('researchUpdated', refreshStudentData);
     };
-  }, [fetchAnnouncements, fetchEvents, fetchResearch]);
+  }, [user?.id]);
 
-  const hasError = gradesError || coursesError || eventsError || announcementsError || researchError;
+  const hasError = !!error;
 
   const gpa = useMemo(() => {
-    if (!grades || grades.length === 0) return 3.85;
-    const avgScore = grades.reduce((sum, g) => sum + g.score, 0) / grades.length;
-    return Math.min(4.0, (avgScore / 100) * 4.0).toFixed(2);
-  }, [grades]);
+    if (!gradesSummary || gradesSummary.totalCourses === 0) return '0.00';
+    return gradesSummary.gwa.toFixed(2);
+  }, [gradesSummary]);
 
-  const completedCourses = grades?.length || 0;
-  const currentClasses = courses?.length || 5;
-  const researchPapers = research?.length ?? (researchError ? mockResearch.length : 0);
+  const completedCourses = gradesSummary?.totalCourses ?? 0;
+  const currentClasses = scheduleData?.totalCourses ?? 0;
+  const researchPapers = researchList.length;
 
-  const recentAnnouncements = (announcements && announcements.length > 0
-    ? announcements
-    : announcementsError
-      ? mockAnnouncements
-      : [])
+  const recentAnnouncements = announcements.slice(0, 3);
+  const upcomingEvents = eventsList
+    .filter((event) => new Date(event.date).getTime() > Date.now())
     .slice(0, 3);
-  const upcomingEvents = (events && events.length > 0
-    ? events
-    : eventsError
-      ? mockEvents
-      : [])
-    .filter(event => new Date(event.date) > new Date())
-    .slice(0, 3);
-  const upcomingActivities = mockActivities.filter(activity => new Date(activity.date) > new Date()).slice(0, 4);
 
   return (
     <div>
@@ -224,23 +225,19 @@ export const StudentDashboard: React.FC = () => {
       <div className="card mb-8">
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
           <Clock className="mr-2" size={20} />
-          Upcoming Activities
+          Upcoming Events
         </h2>
-        {upcomingActivities.length === 0 ? (
-          <EmptyState
-            icon="Clock"
-            title="No upcoming activities"
-            description="Your schedule is clear"
-          />
+        {upcomingEvents.length === 0 ? (
+          <EmptyState icon="Clock" title="No upcoming events" description="Your schedule is clear" />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {upcomingActivities.map((activity) => (
+            {upcomingEvents.map((activity: Event) => (
               <div key={activity.id} className="p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-gray-800">{activity.title}</p>
-                    <p className="text-sm text-gray-600">{activity.course}</p>
-                    <p className="text-xs text-gray-500">{activity.date} at {activity.time}</p>
+                    <p className="text-sm text-gray-600">{activity.type}</p>
+                    <p className="text-xs text-gray-500">{new Date(activity.date).toLocaleDateString()}</p>
                   </div>
                   <span className={`px-2 py-1 rounded text-xs font-bold ${
                     activity.type === 'exam' ? 'bg-red-100 text-red-800' :

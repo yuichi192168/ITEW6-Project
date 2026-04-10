@@ -48,6 +48,8 @@ export const AdminUsers: React.FC = () => {
     password: '',
   });
 
+  const API_BASE = 'http://localhost:8080';
+
   useEffect(() => {
     fetchUsers();
   }, []);

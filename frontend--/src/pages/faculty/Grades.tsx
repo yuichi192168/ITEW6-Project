@@ -1,70 +1,268 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Save } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+
+interface StudentGrade {
+  studentId: string;
+  studentName: string;
+  email: string;
+  yearLevel: number;
+  department: string;
+  attendance: number;
+  activity: number;
+  exam: number;
+  totalGrade: number;
+}
+
+interface Class {
+  id: string;
+  courseCode: string;
+  courseName: string;
+  section: string;
+  semester: string;
+}
+
+interface GradeData {
+  classId: string;
+  classSchedule: Class;
+  studentGrades: StudentGrade[];
+}
 
 export const FacultyGrades: React.FC = () => {
-  const [grades, setGrades] = useState([
-    { id: '1', studentId: '1', studentName: 'John Doe', courseId: '1', grade: 'A', },
-    { id: '2', studentId: '2', studentName: 'Jane Smith', courseId: '1', grade: 'B+', },
-    { id: '3', studentId: '3', studentName: 'Bob Johnson', courseId: '1', grade: 'A-', },
-  ]);
+  const { user } = useAuth();
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [grades, setGrades] = useState<StudentGrade[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const handleGradeChange = (id: string, newGrade: string) => {
-    setGrades(grades.map(g => g.id === id ? { ...g, grade: newGrade } : g));
+  // Fetch available classes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchClasses = async () => {
+      try {
+        const response = await fetch(`http://localhost:8080/faculty/${user.id}/classes`);
+        if (!response.ok) throw new Error('Failed to fetch classes');
+        const data: Class[] = await response.json();
+        setClasses(data);
+        if (data.length > 0) {
+          setSelectedClassId(data[0].id);
+        }
+      } catch (err) {
+        console.error('Error loading classes:', err);
+      }
+    };
+
+    fetchClasses();
+  }, [user?.id]);
+
+  // Fetch grades when class is selected
+  useEffect(() => {
+    if (!user?.id || !selectedClassId) return;
+
+    const fetchGrades = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(
+          `http://localhost:8080/faculty/${user.id}/grades/${selectedClassId}`
+        );
+        if (!response.ok) throw new Error('Failed to fetch grades');
+        const data: GradeData = await response.json();
+        setGrades(data.studentGrades);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error loading grades');
+        setGrades([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGrades();
+  }, [user?.id, selectedClassId]);
+
+  // Handle grade input change
+  const handleGradeChange = (studentId: string, field: 'attendance' | 'activity' | 'exam', value: string) => {
+    const numValue = Math.min(100, Math.max(0, Number(value) || 0));
+    setGrades(
+      grades.map((grade) => {
+        if (grade.studentId === studentId) {
+          const updated = { ...grade, [field]: numValue };
+          // Recalculate total: (attendance * 0.1) + (activity * 0.4) + (exam * 0.5)
+          updated.totalGrade = 
+            (updated.attendance * 0.1) + (updated.activity * 0.4) + (updated.exam * 0.5);
+          return updated;
+        }
+        return grade;
+      })
+    );
   };
+
+  // Save grades
+  const handleSaveGrades = async () => {
+    if (!user?.id || !selectedClassId) return;
+
+    try {
+      setSaving(true);
+      setError(null);
+      
+      const response = await fetch(
+        `http://localhost:8080/faculty/${user.id}/grades/${selectedClassId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            grades: grades.map((g) => ({
+              studentId: g.studentId,
+              attendance: g.attendance,
+              activity: g.activity,
+              exam: g.exam,
+            })),
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to save grades');
+      setSuccess('Grades saved successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error saving grades');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const currentClass = classes.find((c) => c.id === selectedClassId);
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-800 mb-8">Grade Entry</h1>
 
+      {error && (
+        <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">{error}</div>
+      )}
+
+      {success && (
+        <div className="bg-green-100 text-green-800 p-4 rounded-lg mb-6">{success}</div>
+      )}
+
       <div className="card">
-        <div className="mb-4">
+        <div className="mb-6">
           <label className="block text-sm font-semibold text-gray-700 mb-2">Select Course</label>
-          <select className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
-            <option>CS101 - Introduction to Programming</option>
-            <option>CS102 - Data Structures</option>
-            <option>CS201 - Database Systems</option>
+          <select
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            className="w-full md:w-96 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+          >
+            {classes.map((cls) => (
+              <option key={cls.id} value={cls.id}>
+                {cls.courseCode} - {cls.courseName} (Section {cls.section})
+              </option>
+            ))}
           </select>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b-2 border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Student Name</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Student ID</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Grade</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grades.map((grade) => (
-                <tr key={grade.id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="py-3 px-4">{grade.studentName}</td>
-                  <td className="py-3 px-4">{grade.studentId}</td>
-                  <td className="py-3 px-4">
-                    <select
-                      value={grade.grade}
-                      onChange={(e) => handleGradeChange(grade.id, e.target.value)}
-                      className="px-3 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary"
-                    >
-                      <option>A</option>
-                      <option>A-</option>
-                      <option>B+</option>
-                      <option>B</option>
-                      <option>B-</option>
-                      <option>C+</option>
-                      <option>C</option>
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {currentClass && (
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-gray-600">
+              <strong>Class:</strong> {currentClass.courseName} ({currentClass.courseCode}) • 
+              <strong className="ml-3">Section:</strong> {currentClass.section}
+            </p>
+          </div>
+        )}
 
-        <button className="mt-6 flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg">
-          <Save size={20} />
-          Save Grades
-        </button>
+        {loading ? (
+          <div className="text-center py-10">Loading grades...</div>
+        ) : grades.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-gray-600">No students in this class</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto mb-6">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b-2 border-gray-200">
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Student Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Attendance (10%)</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Activity (40%)</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Exam (50%)</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Grade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grades.map((grade) => (
+                    <tr key={grade.studentId} className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="py-3 px-4">
+                        <div>
+                          <p className="font-medium text-gray-800">{grade.studentName}</p>
+                          <p className="text-xs text-gray-500">{grade.department}</p>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-gray-600">{grade.studentId}</td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={grade.attendance}
+                          onChange={(e) =>
+                            handleGradeChange(grade.studentId, 'attendance', e.target.value)
+                          }
+                          className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary"
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={grade.activity}
+                          onChange={(e) =>
+                            handleGradeChange(grade.studentId, 'activity', e.target.value)
+                          }
+                          className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary"
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={grade.exam}
+                          onChange={(e) =>
+                            handleGradeChange(grade.studentId, 'exam', e.target.value)
+                          }
+                          className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary"
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-gray-800 bg-blue-50 px-3 py-1 rounded text-center">
+                          {grade.totalGrade.toFixed(2)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={handleSaveGrades}
+                disabled={saving}
+                className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg disabled:opacity-50"
+              >
+                <Save size={20} />
+                {saving ? 'Saving...' : 'Save Grades'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

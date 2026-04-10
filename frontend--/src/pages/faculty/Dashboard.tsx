@@ -1,102 +1,80 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Users, BarChart3, BookOpen, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useAsync } from '../../hooks/useAsync';
-import { announcementsDB, coursesDB, eventsDB, researchDB } from '../../lib/database';
 import { ErrorMessage, EmptyState } from '../../components/ui/shared';
-import { mockClasses, mockResearch } from '../../lib/constants';
 
-interface Course {
-  id: string;
-  code: string;
-  name: string;
-  semester: string;
-  section?: string;
-  students?: number;
-  schedule?: string;
+interface Dashboard {
+  faculty: { id: string; name: string; email: string };
+  subjects: Array<{ id: string; name: string; code: string; classes: number }>;
+  totalClasses: number;
+  totalStudents: number;
 }
 
-interface Event {
+interface Class {
   id: string;
-  title: string;
-  date: string;
-  type: string;
-  description: string;
-}
-
-interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  date: string;
-  admin: string;
-}
-
-interface ResearchItem {
-  id: string;
-  title: string;
-  author: string;
-  year: number;
-  status: string;
+  courseCode: string;
+  courseName: string;
+  section: string;
+  students: number;
+  schedule: string;
 }
 
 export const FacultyDashboard: React.FC = () => {
   const { user } = useAuth();
-
-  const { data: classes, error: classesError, execute: fetchClasses } = useAsync<Course[]>(() =>
-    coursesDB.getAllCourses().then((data: any) => (data as Course[])).catch(() => mockClasses as Course[])
-  );
-
-  const { data: events, error: eventsError, execute: fetchEvents } = useAsync<Event[]>(() =>
-    eventsDB.getAllEvents().then((data: any) => (data as Event[])).catch(() => [] as Event[])
-  );
-
-  const { data: announcements, error: announcementsError, execute: fetchAnnouncements } = useAsync<Announcement[]>(() =>
-    announcementsDB.getAllAnnouncements().then((data: any) => data as Announcement[]).catch(() => [] as Announcement[])
-  );
-
-  const { data: research, error: researchError, execute: fetchResearch } = useAsync<ResearchItem[]>(() =>
-    researchDB.getAllResearch().then((data: any) => data as ResearchItem[]).catch(() => (mockResearch as unknown as ResearchItem[]))
-  );
+  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchClasses();
-      fetchEvents();
-      fetchAnnouncements();
-      fetchResearch();
-    }
-  }, [user?.id, fetchClasses, fetchEvents, fetchAnnouncements, fetchResearch]);
+    if (!user?.id) return;
 
-  useEffect(() => {
-    const refreshFacultyData = () => {
-      fetchAnnouncements();
-      fetchEvents();
-      fetchResearch();
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`http://localhost:8080/faculty/${user.id}/dashboard`);
+        if (!response.ok) throw new Error('Failed to fetch dashboard');
+        const data: Dashboard = await response.json();
+        setDashboard(data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error loading dashboard');
+        setDashboard(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    window.addEventListener('announcementsUpdated', refreshFacultyData);
-    window.addEventListener('eventsUpdated', refreshFacultyData);
-    window.addEventListener('researchUpdated', refreshFacultyData);
-
-    return () => {
-      window.removeEventListener('announcementsUpdated', refreshFacultyData);
-      window.removeEventListener('eventsUpdated', refreshFacultyData);
-      window.removeEventListener('researchUpdated', refreshFacultyData);
+    const fetchClasses = async () => {
+      try {
+        const response = await fetch(`http://localhost:8080/faculty/${user.id}/classes`);
+        if (!response.ok) throw new Error('Failed to fetch classes');
+        const data: Class[] = await response.json();
+        setClasses(data);
+      } catch (err) {
+        console.error('Error loading classes:', err);
+        setClasses([]);
+      }
     };
-  }, [fetchAnnouncements, fetchEvents, fetchResearch]);
 
-  const totalStudents = classes?.reduce((sum, c) => sum + (c.students || 0), 0) || 0;
-  const courseCount = classes?.length || 0;
-  const courseMaterials = 12; // TODO: Fetch from materials collection
-  const researchPapers = research?.length ?? (researchError ? mockResearch.length : 0);
+    fetchDashboard();
+    fetchClasses();
+  }, [user?.id]);
+
+  const totalStudents = dashboard?.totalStudents || 0;
+  const courseCount = dashboard?.totalClasses || 0;
+  const researchPapers = dashboard?.subjects.length || 0;
 
   const stats = [
     { label: 'Classes Teaching', value: courseCount, icon: Users, color: 'bg-blue-500' },
     { label: 'Total Students', value: totalStudents, icon: BarChart3, color: 'bg-green-500' },
-    { label: 'Course Materials', value: courseMaterials, icon: BookOpen, color: 'bg-purple-500' },
-    { label: 'Research Papers', value: researchPapers, icon: FileText, color: 'bg-orange-500' },
+    { label: 'Subjects', value: dashboard?.subjects?.length || 0, icon: BookOpen, color: 'bg-purple-500' },
+    { label: 'Research', value: researchPapers, icon: FileText, color: 'bg-orange-500' },
   ];
+
+  if (loading) {
+    return <div className="text-center py-10">Loading dashboard...</div>;
+  }
 
   return (
     <div>
@@ -105,7 +83,7 @@ export const FacultyDashboard: React.FC = () => {
         <p className="text-gray-600 mt-2">Welcome {user?.name}! Here's your teaching portal</p>
       </div>
 
-      {(classesError || eventsError || announcementsError || researchError) && <ErrorMessage message="Some data failed to load. Using fallback data." />}
+      {error && <ErrorMessage message={error} />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat) => {
@@ -139,13 +117,13 @@ export const FacultyDashboard: React.FC = () => {
             {classes.map((cls) => (
               <div key={cls.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
                 <div>
-                  <p className="font-semibold text-gray-800">{cls.code} - {cls.name}</p>
+                  <p className="font-semibold text-gray-800">{cls.courseCode} - {cls.courseName}</p>
                   <p className="text-sm text-gray-600">
-                    {cls.section ? `Section ${cls.section}` : 'Section 1'} • {cls.students || 0} students
+                    Section {cls.section} • {cls.students || 0} students
                   </p>
                 </div>
                 <span className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
-                  {cls.schedule || cls.semester}
+                  {cls.schedule}
                 </span>
               </div>
             ))}
@@ -155,3 +133,4 @@ export const FacultyDashboard: React.FC = () => {
     </div>
   );
 };
+
