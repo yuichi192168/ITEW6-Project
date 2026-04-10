@@ -39,9 +39,14 @@ let storage: FirebaseStorage | null = null;
 
 if (!firebaseInitError) {
   app = initializeApp(firebaseConfig as FirebaseOptions);
-  if (firebaseConfig.measurementId) {
-    analytics = getAnalytics(app);
-  }
+  // Disable Analytics if working offline or on restricted network
+  // if (firebaseConfig.measurementId) {
+  //   try {
+  //     analytics = getAnalytics(app);
+  //   } catch (error) {
+  //     console.warn('Firebase Analytics initialization failed (likely network issue):', error);
+  //   }
+  // }
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);

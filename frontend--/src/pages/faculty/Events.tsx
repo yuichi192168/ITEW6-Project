@@ -1,66 +1,113 @@
-import React, { useEffect, useMemo } from 'react';
-import { CalendarDays } from 'lucide-react';
-import { useAsync } from '../../hooks/useAsync';
-import { eventsDB } from '../../lib/database';
-import { EmptyState } from '../../components/ui/shared';
-import { mockEvents } from '../../lib/constants';
+import React, { useEffect, useState } from 'react';
+import { CalendarDays, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface Event {
   id: string;
   title: string;
-  date: string;
   description: string;
+  date: string;
+  location: string;
   type: string;
+  isRegistered: boolean;
 }
 
 export const FacultyEvents: React.FC = () => {
-  const { data: events, error, execute: fetchEvents } = useAsync<Event[]>(() =>
-    eventsDB.getAllEvents().then((data: any) => data as Event[]).catch(() => (mockEvents as unknown as Event[]))
-  );
+  const { user } = useAuth();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`http://localhost:8080/faculty/${user.id}/events`);
+        if (!response.ok) throw new Error('Failed to fetch events');
+        const data: Event[] = await response.json();
+        const sorted = data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        setEvents(sorted);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error loading events');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchEvents();
-  }, [fetchEvents]);
+  }, [user?.id]);
 
-  useEffect(() => {
-    const refreshEvents = () => fetchEvents();
-    window.addEventListener('eventsUpdated', refreshEvents);
-    return () => window.removeEventListener('eventsUpdated', refreshEvents);
-  }, [fetchEvents]);
+  const handleJoinEvent = async (eventId: string) => {
+    if (!user?.id) return;
 
-  const visibleEvents = useMemo(() => {
-    if (events && events.length > 0) return events;
-    if (error) return mockEvents as unknown as Event[];
-    return [] as Event[];
-  }, [events, error]);
+    try {
+      const response = await fetch(`http://localhost:8080/faculty/${user.id}/events/${eventId}/join`, {
+        method: 'POST',
+      });
 
-  const sortedEvents = useMemo(
-    () => [...visibleEvents].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [visibleEvents]
-  );
+      if (!response.ok) throw new Error('Failed to join event');
+      
+      setEvents(
+        events.map((event) =>
+          event.id === eventId ? { ...event, isRegistered: true } : event
+        )
+      );
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error joining event');
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-10">Loading events...</div>;
+  }
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-800 mb-8">Events</h1>
 
-      {sortedEvents.length === 0 ? (
-        <EmptyState
-          icon="Calendar"
-          title="No events yet"
-          description="Admin-created events will appear here once they are published."
-        />
+      {error && (
+        <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">{error}</div>
+      )}
+
+      {events.length === 0 ? (
+        <div className="card text-center py-10">
+          <p className="text-gray-600">No events available at the moment.</p>
+        </div>
       ) : (
         <div className="space-y-4">
-          {sortedEvents.map((event) => (
+          {events.map((event) => (
             <div key={event.id} className="card border-l-4 border-primary">
               <div className="flex items-start justify-between gap-4">
-                <div>
+                <div className="flex-1">
                   <h3 className="text-lg font-bold text-gray-800">{event.title}</h3>
                   <p className="text-gray-600 mt-1">{event.description}</p>
+                  <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+                    <span>📍 {event.location}</span>
+                    <span>🏷️ {event.type}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-primary font-semibold whitespace-nowrap">
-                  <CalendarDays size={20} />
-                  <span>{event.date}</span>
+                <div className="flex flex-col items-end gap-3">
+                  <div className="flex items-center gap-2 text-primary font-semibold">
+                    <CalendarDays size={20} />
+                    <span>{new Date(event.date).toLocaleDateString()}</span>
+                  </div>
+                  {event.isRegistered ? (
+                    <div className="flex items-center gap-1 text-green-600 font-semibold">
+                      <CheckCircle size={20} />
+                      Registered
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleJoinEvent(event.id)}
+                      className="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm"
+                    >
+                      Join Event
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

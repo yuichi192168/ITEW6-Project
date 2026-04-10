@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Code, Edit, GraduationCap, Globe, Mail, User, Briefcase, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
-import { studentDB } from '../../lib/database';
 import { ErrorMessage, LoadingSpinner } from '../../components/ui/shared';
 
 interface StudentProfileRecord {
@@ -83,7 +82,12 @@ export const StudentProfile: React.FC = () => {
     () => async () => {
       if (!user?.id) return null;
       try {
-        return (await studentDB.getStudent(user.id)) as StudentProfileRecord | null;
+        const response = await fetch(`http://localhost:8080/student/${user.id}/profile`);
+        if (!response.ok) {
+          if (response.status === 404) return null;
+          throw new Error('Failed to fetch profile');
+        }
+        return (await response.json()) as StudentProfileRecord;
       } catch (error) {
         if (error instanceof Error && error.message === 'Record not found') {
           return null;
@@ -183,7 +187,17 @@ export const StudentProfile: React.FC = () => {
         image: tempProfile.image,
       };
 
-      await studentDB.updateStudent(user.id, normalizedProfile);
+      const response = await fetch(`http://localhost:8080/student/${user.id}/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(normalizedProfile),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.message || 'Unable to save student profile.');
+      }
+
       const refreshedProfile = toProfileForm({ ...normalizedProfile, id: user.id }, user.name, user.email);
       setProfile(refreshedProfile);
       setTempProfile(refreshedProfile);

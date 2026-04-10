@@ -3,6 +3,31 @@
   "subjects": [],
   "students": [
     {
+      "id": "3zuh9uR0AzY0ri6psnCR4VItB2B2",
+      "name": "Current Student",
+      "email": "student@school.com",
+      "idNumber": "2026001",
+      "year": "2nd",
+      "program": "BSCS",
+      "status": "Regular",
+      "phone": "09123456789",
+      "address": "123 Student St",
+      "dateOfBirth": "2004-01-15",
+      "skills": "web development, communication",
+      "organizations": "Tech Club",
+      "role": "student",
+      "createdAt": "2026-04-08T00:00:00.000Z",
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T11:33:01.371Z",
+      "updatedAt": "2026-04-08T11:33:01.371Z",
+      "registered_events": [
+        "evt-001"
+      ],
+      "registeredEvents": [
+        "evt-001"
+      ]
+    },
+    {
       "id": "qWLcft5JVze7nG3LpT5VyttUgoD2",
       "name": "Mikha Lim",
       "email": "yuichi292168@gmail.com",
@@ -23,19 +48,134 @@
     }
   ],
   "faculties": [],
-  "courses": [],
-  "grades": [],
-  "schedules": [],
+  "courses": [
+    {
+      "id": "cs101",
+      "code": "CS101",
+      "name": "Introduction to Web Development",
+      "credits": 3,
+      "semester": "Spring 2026",
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T00:00:00.000Z"
+    },
+    {
+      "id": "cs102",
+      "code": "CS102",
+      "name": "Database Systems",
+      "credits": 3,
+      "semester": "Spring 2026",
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T00:00:00.000Z"
+    }
+  ],
+  "grades": [
+    {
+      "id": "grade1",
+      "studentId": "3zuh9uR0AzY0ri6psnCR4VItB2B2",
+      "classId": "cs101",
+      "courseCode": "CS101",
+      "courseName": "Introduction to Web Development",
+      "term": "Spring 2026",
+      "attendance": 95,
+      "activity": 90,
+      "exam": 88,
+      "totalGrade": 90.33,
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T00:00:00.000Z"
+    },
+    {
+      "id": "grade2",
+      "studentId": "3zuh9uR0AzY0ri6psnCR4VItB2B2",
+      "classId": "cs102",
+      "courseCode": "CS102",
+      "courseName": "Database Systems",
+      "term": "Spring 2026",
+      "attendance": 92,
+      "activity": 88,
+      "exam": 85,
+      "totalGrade": 88.33,
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T00:00:00.000Z"
+    }
+  ],
+  "schedules": [
+    {
+      "id": "sched1",
+      "studentId": "3zuh9uR0AzY0ri6psnCR4VItB2B2",
+      "classId": "cs101",
+      "courseCode": "CS101",
+      "courseName": "Introduction to Web Development",
+      "instructor": "Dr. Johnson",
+      "room": "Tech Building 205",
+      "dayOfWeek": "Monday",
+      "startTime": "09:00",
+      "endTime": "10:30",
+      "enrolled": true,
+      "materials": [
+        {
+          "id": "mat1",
+          "title": "Lecture Slides Week 1",
+          "type": "pdf",
+          "url": "https://example.com/materials/cs101-week1.pdf",
+          "uploadedAt": "2026-04-01"
+        }
+      ],
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T00:00:00.000Z"
+    },
+    {
+      "id": "sched2",
+      "studentId": "3zuh9uR0AzY0ri6psnCR4VItB2B2",
+      "classId": "cs102",
+      "courseCode": "CS102",
+      "courseName": "Database Systems",
+      "instructor": "Dr. Smith",
+      "room": "Lab 101",
+      "dayOfWeek": "Wednesday",
+      "startTime": "10:00",
+      "endTime": "11:30",
+      "enrolled": true,
+      "materials": [
+        {
+          "id": "mat2",
+          "title": "Database Design Guide",
+          "type": "pdf",
+          "url": "https://example.com/materials/cs102-guide.pdf",
+          "uploadedAt": "2026-04-02"
+        }
+      ],
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T00:00:00.000Z"
+    }
+  ],
   "events": [
     {
+      "id": "evt-001",
+      "title": "Tech Talk: Web Development Trends",
+      "date": "2026-04-15",
+      "description": "Learn about the latest trends in web development",
+      "type": "seminar",
+      "location": "Auditorium A",
+      "startTime": "14:00",
+      "endTime": "16:00",
+      "attendees": [
+        "3zuh9uR0AzY0ri6psnCR4VItB2B2"
+      ],
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T00:00:00.000Z",
+      "createdAt": "2026-04-08T00:00:00.000Z",
+      "updatedAt": "2026-04-08T00:00:00.000Z"
+    },
+    {
       "id": "5cea4a34-c054-4fd4-87da-c271a2ae0768",
-      "title": "wew",
-      "date": "2026-04-06",
-      "description": "wewweweweweweweewe",
+      "title": "Spring Fest 2026",
+      "date": "2026-04-20",
+      "description": "Annual spring festival celebration",
       "type": "school",
-      "location": "wew",
-      "startTime": "12:29",
-      "endTime": "15:33",
+      "location": "Campus Grounds",
+      "startTime": "12:00",
+      "endTime": "18:00",
+      "attendees": [],
       "created_at": "2026-04-06T04:29:29.758Z",
       "updated_at": "2026-04-06T04:29:29.758Z",
       "createdAt": "2026-04-06T04:29:29.758Z",
@@ -44,11 +184,30 @@
   ],
   "research": [
     {
-      "id": "77c6b26d-58a7-42d5-8fd7-e1c8763e1755",
-      "title": "wew",
-      "author": "wew",
+      "id": "res-001",
+      "title": "Machine Learning Applications in Education",
+      "author": "Current Student",
+      "studentId": "3zuh9uR0AzY0ri6psnCR4VItB2B2",
+      "adviser": "Dr. Garcia",
       "year": 2026,
       "status": "In Progress",
+      "description": "Exploring how machine learning can improve personalized learning experiences",
+      "publications": [],
+      "created_at": "2026-04-08T00:00:00.000Z",
+      "updated_at": "2026-04-08T00:00:00.000Z",
+      "createdAt": "2026-04-08T00:00:00.000Z",
+      "updatedAt": "2026-04-08T00:00:00.000Z"
+    },
+    {
+      "id": "77c6b26d-58a7-42d5-8fd7-e1c8763e1755",
+      "title": "Web Performance Optimization",
+      "author": "Mikha Lim",
+      "studentId": "qWLcft5JVze7nG3LpT5VyttUgoD2",
+      "adviser": "Dr. Lee",
+      "year": 2026,
+      "status": "In Progress",
+      "description": "Study of techniques to optimize web application performance",
+      "publications": [],
       "created_at": "2026-04-06T04:29:56.663Z",
       "updated_at": "2026-04-06T04:29:56.663Z",
       "createdAt": "2026-04-06T04:29:56.663Z",
@@ -71,5 +230,6 @@
     }
   ],
   "disciplineRecords": [],
-  "messages": []
+  "messages": [],
+  "syllabi": []
 }

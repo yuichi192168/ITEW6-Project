@@ -1,81 +1,85 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { mockGrades } from '../../lib/constants';
-import { TrendingUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+
+interface StudentGrade {
+  gradeId: string;
+  classId: string;
+  courseCode: string;
+  courseName: string;
+  term: string;
+  attendance: number;
+  activity: number;
+  exam: number;
+  totalGrade: number;
+}
+
+interface StudentGradesResponse {
+  studentId: string;
+  grades: StudentGrade[];
+  gwa: number;
+  totalCourses: number;
+}
 
 export const StudentGrades: React.FC = () => {
   const { user } = useAuth();
   const [selectedTerm, setSelectedTerm] = useState<string>('All Terms');
-  const gradePoints: Record<string, number> = { 'A': 4.0, 'A-': 3.7, 'B+': 3.3, 'B': 3.0 };
-
-  const parseYearLevel = (value: unknown): number => {
-    if (typeof value === 'number') return Math.min(4, Math.max(1, value));
-    if (typeof value === 'string') {
-      const normalized = value.toLowerCase();
-      if (normalized.includes('first') || normalized.includes('1st')) return 1;
-      if (normalized.includes('second') || normalized.includes('2nd')) return 2;
-      if (normalized.includes('third') || normalized.includes('3rd')) return 3;
-      if (normalized.includes('fourth') || normalized.includes('4th')) return 4;
-      const extracted = normalized.match(/\d+/);
-      if (extracted) {
-        const year = parseInt(extracted[0], 10);
-        return Math.min(4, Math.max(1, year));
-      }
-    }
-    return 4;
-  };
-
-  const allYearTerms = [
-    'First Year First Sem',
-    'First Year Second Sem',
-    'Second Year First Sem',
-    'Second Year Second Sem',
-    'Third Year First Sem',
-    'Third Year Second Sem',
-    'Fourth Year First Sem',
-    'Fourth Year Second Sem',
-  ];
-
-  const termOptions = useMemo(() => {
-    const currentYear = parseYearLevel(user?.yearLevel ?? user?.year);
-    const allowedTerms = allYearTerms.slice(0, currentYear * 2);
-    const existingTerms = Array.from(new Set(mockGrades.map((g) => g.semester)));
-    const terms = allowedTerms.filter((term) => existingTerms.includes(term));
-    return ['All Terms', ...terms];
-  }, [user?.yearLevel, user?.year]);
+  const [grades, setGrades] = useState<StudentGrade[]>([]);
+  const [termOptions, setTermOptions] = useState<string[]>(['All Terms']);
+  const [gwa, setGwa] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!termOptions.includes(selectedTerm)) {
-      setSelectedTerm('All Terms');
-    }
-  }, [termOptions, selectedTerm]);
+    if (!user?.id) return;
 
-  const filteredGrades = useMemo(() => {
-    if (selectedTerm === 'All Terms') return mockGrades;
-    return mockGrades.filter((grade) => grade.semester === selectedTerm);
-  }, [selectedTerm]);
+    const fetchGrades = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const queryParam = selectedTerm === 'All Terms' ? 'all' : selectedTerm;
+        const response = await fetch(`http://localhost:8080/student/${user.id}/grades?term=${encodeURIComponent(queryParam)}`);
+        if (!response.ok) {
+          throw new Error('Failed to load grades');
+        }
+
+        const data: StudentGradesResponse = await response.json();
+        setGrades(data.grades);
+        setGwa(data.gwa);
+
+        const terms = Array.from(new Set(data.grades.map((grade) => grade.term)));
+        setTermOptions(['All Terms', ...terms]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to load grades');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGrades();
+  }, [user?.id, selectedTerm]);
 
   const avgGPA = useMemo(() => {
-    if (filteredGrades.length === 0) return '0.00';
-    const total = filteredGrades.reduce((sum, grade) => sum + (gradePoints[grade.grade] || 0), 0);
-    return (total / filteredGrades.length).toFixed(2);
-  }, [filteredGrades]);
+    return gwa.toFixed(2);
+  }, [gwa]);
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">My Grades</h1>
-
-      <div className="card mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-gray-600 text-sm">Overall GPA</p>
-            <p className="text-4xl font-bold text-gray-800 mt-2">{avgGPA}</p>
-          </div>
-          <TrendingUp className="text-green-500" size={48} />
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">My Grades</h1>
+          <p className="text-gray-600 mt-2">Your grade preview and calculated GWA</p>
+        </div>
+        <div className="text-right">
+          <p className="text-gray-600 text-sm">GWA</p>
+          <p className="text-4xl font-bold text-gray-800 mt-2">{avgGPA}</p>
         </div>
       </div>
 
-      <div className="card">
+      {loading && <div className="text-center py-8">Loading grades...</div>}
+      {error && <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">{error}</div>}
+
+      <div className="card mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
           <h2 className="text-xl font-bold text-gray-800">Grade Report</h2>
           <div className="flex items-center gap-2">
@@ -100,28 +104,24 @@ export const StudentGrades: React.FC = () => {
             <thead>
               <tr className="border-b-2 border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Course Code</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Grade</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Course Name</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Term</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Grade</th>
               </tr>
             </thead>
             <tbody>
-              {filteredGrades.map((grade) => (
-                <tr key={grade.id} className="border-b border-gray-200 hover:bg-gray-50">
+              {grades.map((grade) => (
+                <tr key={grade.gradeId} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="py-3 px-4">{grade.courseCode}</td>
-                  <td className="py-3 px-4">
-                    <span className="bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded">{grade.grade}</span>
-                  </td>
-                  <td className="py-3 px-4">{grade.semester}</td>
-                  <td className="py-3 px-4">
-                    <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full">Completed</span>
-                  </td>
+                  <td className="py-3 px-4">{grade.courseName}</td>
+                  <td className="py-3 px-4">{grade.term}</td>
+                  <td className="py-3 px-4 font-semibold text-gray-800">{grade.totalGrade}</td>
                 </tr>
               ))}
-              {filteredGrades.length === 0 && (
+              {grades.length === 0 && !loading && (
                 <tr>
                   <td className="py-6 px-4 text-gray-500 text-center" colSpan={4}>
-                    No grades found for the selected term.
+                    No grades found for this term.
                   </td>
                 </tr>
               )}
