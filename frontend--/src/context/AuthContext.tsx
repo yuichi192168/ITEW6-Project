@@ -9,7 +9,7 @@ import {
   browserLocalPersistence,
 } from 'firebase/auth';
 import { auth, db, firebaseInitError } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'student' | 'faculty';
 
@@ -71,7 +71,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    let userDocUnsubscribe: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth!, (currentUser) => {
+      if (userDocUnsubscribe) {
+        userDocUnsubscribe();
+        userDocUnsubscribe = null;
+      }
+
       try {
         if (currentUser) {
           setFirebaseUser(currentUser);
@@ -84,19 +91,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             photoURL: currentUser.photoURL || undefined,
           };
           setUser(basicUser);
-          
-          // Fetch full user data from Firestore in background (non-blocking)
-          getDoc(doc(db, 'users', currentUser.uid))
-            .then((userDoc) => {
-              if (userDoc.exists()) {
-                const userData = userDoc.data() as User;
-                setUser(userData); // Update with full Firestore data
+
+          if (db) {
+            const userRef = doc(db, 'users', currentUser.uid);
+            userDocUnsubscribe = onSnapshot(
+              userRef,
+              (userDoc) => {
+                if (userDoc.exists()) {
+                  const userData = userDoc.data() as User;
+                  setUser(userData);
+                }
+              },
+              (err) => {
+                console.warn('Failed to subscribe to Firestore user updates:', err);
               }
-            })
-            .catch((err) => {
-              console.warn('Could not fetch Firestore user data (this is OK during initial login):', err);
-              // User is already set from Firebase Auth, so continue
-            });
+            );
+          }
         } else {
           setFirebaseUser(null);
           setUser(null);
@@ -109,7 +119,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (userDocUnsubscribe) {
+        userDocUnsubscribe();
+      }
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<void> => {
@@ -119,18 +134,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw firebaseInitError;
       }
 
-      const result = await signInWithEmailAndPassword(auth!, email, password);
+      console.log('[AUTH] Attempting login for:', email);
       
-      // Fetch user data from Firestore
-      const userDoc = await getDoc(doc(db!, 'users', result.user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as User;
-        setUser(userData);
+      const result = await signInWithEmailAndPassword(auth!, email.trim(), password);
+      console.log('[AUTH] Login successful for:', email, 'UID:', result.user.uid);
+      
+      const signedInEmail = result.user.email || '';
+      const detectedRole = getUserRoleFromEmail(signedInEmail);
+      console.log('[AUTH] Detected role from email:', detectedRole);
+
+      if (db) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            console.log('[AUTH] Found Firestore user doc, using stored data:', userData);
+            setUser(userData);
+            return;
+          } else {
+            console.log('[AUTH] No Firestore user doc found, using fallback');
+          }
+        } catch (dbErr) {
+          console.warn('[AUTH] Error fetching Firestore doc:', dbErr);
+        }
       }
+
+      const fallbackUser: User = {
+        id: result.user.uid,
+        name: result.user.displayName || signedInEmail.split('@')[0] || 'User',
+        email: signedInEmail,
+        role: detectedRole,
+        photoURL: result.user.photoURL || undefined,
+      };
+      console.log('[AUTH] Setting fallback user with role:', fallbackUser.role);
+      setUser(fallbackUser);
     } catch (err: any) {
-      const errorMessage = err.message || 'Login failed';
+      const errorCode = err?.code || '';
+      const errorMessage = err?.message || 'Login failed';
+      console.error('[AUTH] Login error - Code:', errorCode, 'Message:', errorMessage, 'Full error:', err);
       setError(errorMessage);
-      throw new Error(errorMessage);
+      throw err;
     }
   };
 

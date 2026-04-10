@@ -13,6 +13,7 @@ export const menuItems: Record<UserRole, MenuItem[]> = {
     { label: 'Faculty', path: '/dashboard/admin/faculty', icon: 'Users2' },
     { label: 'Scheduling', path: '/dashboard/admin/scheduling', icon: 'Calendar' },
     { label: 'Subjects & Curriculum', path: '/dashboard/admin/subjects', icon: 'BookOpen' },
+    { label: 'Guidance', path: '/dashboard/admin/guidance', icon: 'ShieldAlert' },
     { label: 'Events', path: '/dashboard/admin/events', icon: 'CalendarDays' },
     { label: 'Announcements', path: '/dashboard/admin/announcements', icon: 'Bell' },
     { label: 'Research', path: '/dashboard/admin/research', icon: 'FileText' },

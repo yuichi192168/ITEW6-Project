@@ -260,6 +260,14 @@ export const facultyDB = {
   },
 };
 
+export const subjectsDB = {
+  getSubject: (subjectId: string) => getDocument('subjects', subjectId),
+  getAllSubjects: () => getCollection('subjects'),
+  addSubject: (data: any) => addDocument('subjects', data),
+  updateSubject: (subjectId: string, data: any) => updateDocument('subjects', subjectId, data),
+  deleteSubject: (subjectId: string) => deleteDocument('subjects', subjectId),
+};
+
 /**
  * Admin-specific operations
  */
@@ -360,4 +368,5 @@ export const guidanceDB = {
 
     return snapshots.docs.map((snapshot) => withId(snapshot.id, snapshot.data()));
   },
+  addDisciplineRecord: async (data: any) => addDocument('disciplineRecords', data),
 };

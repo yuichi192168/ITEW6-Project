@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Trash2, Edit2, Search } from 'lucide-react';
+import { Trash2, Edit2, Search, Mail } from 'lucide-react';
 import { useAsync } from '../../hooks/useAsync';
 import { useForm } from '../../hooks/useAsync';
 import { useSearch } from '../../hooks/useAsync';
 import { usePagination } from '../../hooks/useAsync';
-import { eventsDB } from '../../lib/database';
+import { eventsDB, facultyDB } from '../../lib/database';
 import { LoadingSpinner, ErrorMessage, EmptyState, FormInput, SectionHeader, Pagination, Card } from '../../components/ui/shared';
 
 interface Event {
@@ -16,6 +16,15 @@ interface Event {
   location?: string;
   startTime?: string;
   endTime?: string;
+  invitedDepartments?: string[];
+  createdAt?: string;
+}
+
+interface Faculty {
+  id: string | number;
+  name: string;
+  department?: string;
+  email?: string;
 }
 
 interface EventFormData {
@@ -26,6 +35,7 @@ interface EventFormData {
   location: string;
   startTime: string;
   endTime: string;
+  invitedDepartments?: string[];
 }
 
 const initialFormState: EventFormData = {
@@ -36,6 +46,7 @@ const initialFormState: EventFormData = {
   location: '',
   startTime: '',
   endTime: '',
+  invitedDepartments: [],
 };
 
 const validationSchema = {
@@ -73,6 +84,9 @@ export const AdminEvents: React.FC = () => {
   const { data: eventsData, loading, error, execute: fetchEvents } = useAsync<Event[]>(() =>
     eventsDB.getAllEvents().then((data: any) => data as Event[])
   );
+  const { data: faculties, execute: fetchFaculties } = useAsync<Faculty[]>(() =>
+    facultyDB.getAllFaculty().then((data: any) => data as Faculty[])
+  );
 
   const { formData, errors, touched, handleChange, handleBlur, reset, setFormData } = useForm<EventFormData>(
     initialFormState,
@@ -92,9 +106,18 @@ export const AdminEvents: React.FC = () => {
 
   const { currentPage, totalPages, currentData, goToPage } = usePagination(typeFiltered, 5);
 
+  const uniqueDepartments = useMemo(() => {
+    const depts = new Set<string>();
+    faculties?.forEach((f) => {
+      if (f.department) depts.add(f.department);
+    });
+    return Array.from(depts).sort();
+  }, [faculties]);
+
   useEffect(() => {
     fetchEvents();
-  }, [fetchEvents]);
+    fetchFaculties();
+  }, [fetchEvents, fetchFaculties]);
 
   useEffect(() => {
     if (eventsData && eventsData.length > 0) {
@@ -158,9 +181,18 @@ export const AdminEvents: React.FC = () => {
       location: e.location || '',
       startTime: e.startTime || '',
       endTime: e.endTime || '',
+      invitedDepartments: e.invitedDepartments || [],
     });
     setEditingId(e.id);
     setShowForm(true);
+  };
+
+  const toggleDepartmentInvite = (dept: string) => {
+    const current = formData.invitedDepartments || [];
+    const updated = current.includes(dept)
+      ? current.filter((d) => d !== dept)
+      : [...current, dept];
+    setFormData({ ...formData, invitedDepartments: updated });
   };
 
   const handleDelete = async (id: string) => {
@@ -285,6 +317,34 @@ export const AdminEvents: React.FC = () => {
                 <p className="text-red-600 text-xs font-medium mt-1">{errors.description}</p>
               )}
             </div>
+            {formData.type === 'school' && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Mail size={16} />
+                  Invite Departments (Schoolwide Event)
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {uniqueDepartments.length === 0 ? (
+                    <p className="text-gray-500 text-sm col-span-full">No departments available</p>
+                  ) : (
+                    uniqueDepartments.map((dept) => (
+                      <label
+                        key={dept}
+                        className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(formData.invitedDepartments || []).includes(dept)}
+                          onChange={() => toggleDepartmentInvite(dept)}
+                          className="w-4 h-4 rounded accent-primary"
+                        />
+                        <span className="text-sm font-medium text-gray-700">{dept}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
             <button
               onClick={handleAddOrUpdate}
               disabled={hasValidationErrors}
@@ -358,6 +418,7 @@ export const AdminEvents: React.FC = () => {
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Time</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Location</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Type</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Invited Depts</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
@@ -374,6 +435,19 @@ export const AdminEvents: React.FC = () => {
                         <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full capitalize">
                           {e.type}
                         </span>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        {e.type === 'school' && e.invitedDepartments && e.invitedDepartments.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {e.invitedDepartments.map((dept) => (
+                              <span key={dept} className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">
+                                {dept}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="py-3 px-4 flex gap-2">
                         <button
