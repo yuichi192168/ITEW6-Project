@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Trash2, Edit2, Eye, EyeOff, Search, X, User } from 'lucide-react';
-import { useAsync, useForm, useSearch } from '../../hooks/useAsync';
+import { Eye, EyeOff, Search, X, User } from 'lucide-react';
+import { useAsync, useForm, usePagination, useSearch } from '../../hooks/useAsync';
 import { studentDB } from '../../lib/database';
-import { auth, db } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
 import { createUserWithEmailAndPassword, getAuth as getAuthFromApp } from 'firebase/auth';
 import { initializeApp, getApps, type FirebaseOptions } from 'firebase/app';
 import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { FormInput, SectionHeader, Card } from '../../components/ui/shared';
-import { emitSyncEvent, onSyncEvent } from '../../lib/syncEvents';
+import { emitSyncEvent } from '../../lib/syncEvents';
 
 // Setup secondary Firebase app for student account creation
 const firebaseConfig: FirebaseOptions = {
@@ -152,12 +152,12 @@ export const AdminStudents: React.FC = () => {
     const expectedPrefix = `${yearPrefixMap[nextYear] || ''}${programPrefixes[nextProgram] || ''}`;
 
     if (currentSection && expectedPrefix && !currentSection.startsWith(expectedPrefix)) {
-      setFormData((previous) => ({
-        ...previous,
+      setFormData({
+        ...formData,
         year: nextYear,
         program: nextProgram,
         section: '',
-      }));
+      });
       return true;
     }
 
@@ -197,6 +197,15 @@ export const AdminStudents: React.FC = () => {
       return matchesYear && matchesStatus && matchesSkill && matchesOrganization;
     });
   }, [filteredStudents, yearFilter, statusFilter, skillFilter, organizationFilter]);
+
+  const {
+    currentPage,
+    totalPages,
+    currentData: pagedStudents,
+    goToPage,
+    itemsPerPage,
+    setItemsPerPage,
+  } = usePagination(displayedStudents, 20);
 
   const handleEdit = (student: any) => {
     setErrorMessage(null);
@@ -557,7 +566,7 @@ export const AdminStudents: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {displayedStudents.map((s: any) => (
+              {pagedStudents.map((s: any) => (
                 <tr key={s.id} className="border-b hover:bg-gray-50 transition-colors">
                   <td className="p-4">
                     <div className="font-medium text-gray-800">{s.name}</div>
@@ -604,6 +613,49 @@ export const AdminStudents: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <label htmlFor="students-per-page">Rows per page:</label>
+            <select
+              id="students-per-page"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                goToPage(1);
+              }}
+              className="rounded border border-gray-300 px-2 py-1"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>
+              Showing {displayedStudents.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, displayedStudents.length)} of {displayedStudents.length}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="rounded border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="rounded border border-gray-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </Card>
 

@@ -532,19 +532,21 @@ export const AdminFaculty: React.FC = () => {
                 )}
               </div>
             )}
-            <button
-              onClick={handleAddOrUpdate}
-              disabled={hasValidationErrors || isSubmitting}
-              className="col-span-full md:col-span-1 bg-primary hover:bg-primary-dark disabled:bg-gray-300 text-white py-2 rounded-lg font-medium transition"
-            >
-              {isSubmitting ? 'Processing...' : editingId ? 'Update Faculty' : 'Add Faculty'}
-            </button>
-            <button
-              onClick={handleCancel}
-              className="col-span-full md:col-span-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-medium transition"
-            >
-              Cancel
-            </button>
+            <div className="col-span-full flex flex-wrap gap-3 pt-2">
+              <button
+                onClick={handleAddOrUpdate}
+                disabled={hasValidationErrors || isSubmitting}
+                className="bg-primary hover:bg-primary-dark disabled:bg-gray-300 text-white px-6 py-2 rounded-xl font-semibold transition min-w-[170px]"
+              >
+                {isSubmitting ? 'Processing...' : editingId ? '✓ Update Faculty' : '✚ Add Faculty'}
+              </button>
+              <button
+                onClick={handleCancel}
+                className="bg-slate-500 hover:bg-slate-600 text-white px-6 py-2 rounded-xl font-semibold transition min-w-[130px]"
+              >
+                ✕ Cancel
+              </button>
+            </div>
           </div>
         </Card>
       )}

@@ -134,7 +134,15 @@ export const usePagination = <T,>(data: T[], defaultItemsPerPage = 10) => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentData = data.slice(startIndex, startIndex + itemsPerPage);
 
-  const goToPage = (page: number) => setCurrentPage(Math.min(Math.max(1, page), totalPages));
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const goToPage = useCallback((page: number) => {
+    setCurrentPage(Math.min(Math.max(1, page), totalPages));
+  }, [totalPages]);
 
   return { currentPage, totalPages, currentData, goToPage, itemsPerPage, setItemsPerPage };
 };

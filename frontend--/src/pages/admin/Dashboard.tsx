@@ -123,12 +123,24 @@ export const AdminDashboard: React.FC = () => {
 
   const hasError = !!(studentsError || facultyError || coursesError || eventsError || announcementsError);
 
+  // Normalize related department names so they group together
+  const normalizeDept = (dept: string): string => {
+    const normalized = dept.trim().toLowerCase();
+    if (normalized === 'bsit' || normalized === 'information technology') {
+      return 'Information Technology';
+    }
+    if (normalized === 'bscs' || normalized === 'computer science') {
+      return 'Computer Science';
+    }
+    return dept.trim();
+  };
+
   // Calculate comprehensive statistics
   const departmentStats = useMemo(() => {
     const deptMap = new Map<string, { students: number; faculty: number }>();
 
     students?.forEach(student => {
-      const dept = student.program || 'Unknown';
+      const dept = normalizeDept(student.program || 'Unknown');
       if (!deptMap.has(dept)) {
         deptMap.set(dept, { students: 0, faculty: 0 });
       }
@@ -136,7 +148,7 @@ export const AdminDashboard: React.FC = () => {
     });
 
     faculty?.forEach(fac => {
-      const dept = fac.department || 'Unknown';
+      const dept = normalizeDept(fac.department || 'Unknown');
       if (!deptMap.has(dept)) {
         deptMap.set(dept, { students: 0, faculty: 0 });
       }

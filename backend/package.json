@@ -6,7 +6,8 @@
     "scripts": {
         "dev": "node src/server.js",
         "build": "npm install && vite build",
-        "start": "node src/server.js"
+        "start": "node src/server.js",
+        "seed:test-students": "node scripts/generate-test-student-data.mjs"
     },
     "dependencies": {
         "cors": "^2.8.5",
