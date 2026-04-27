@@ -38,6 +38,7 @@ const ensureAdminApp = () => {
   const shouldUseEmulator = String(process.env.FIREBASE_USE_EMULATOR ?? '').toLowerCase() === 'true';
   const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
   const hasServiceAccountEnv = Boolean(clientEmail && privateKey);
+  const hasGoogleCredentialsPath = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS);
 
   if (!projectId) {
     throw new Error('Missing Firebase Admin environment variable: FIREBASE_PROJECT_ID');
@@ -53,17 +54,19 @@ const ensureAdminApp = () => {
     return admin.firestore();
   }
 
-  if (!hasServiceAccountEnv) {
-    throw new Error('Missing Firebase Admin service account environment variables: FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY');
+  if (!hasServiceAccountEnv && !hasGoogleCredentialsPath) {
+    throw new Error('Missing Firebase Admin credentials. Set FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY or GOOGLE_APPLICATION_CREDENTIALS');
   }
 
   admin.initializeApp({
     projectId,
-    credential: admin.credential.cert({
-      projectId,
-      clientEmail,
-      privateKey: privateKey.replace(/\\n/g, '\n'),
-    }),
+    credential: hasServiceAccountEnv
+      ? admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey: privateKey.replace(/\\n/g, '\n'),
+        })
+      : admin.credential.applicationDefault(),
   });
 
   return admin.firestore();

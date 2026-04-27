@@ -21,5 +21,8 @@
         "education-management-backend": "file:",
         "express": "^5.1.0",
         "firebase-admin": "^13.0.2"
+    },
+    "devDependencies": {
+        "firebase-tools": "^15.15.0"
     }
 }
