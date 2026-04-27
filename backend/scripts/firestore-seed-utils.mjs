@@ -21,6 +21,80 @@ const defaultDb = {
 
 const collectionKeys = Object.keys(defaultDb);
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableFirestoreError = (error) => {
+  const code = Number(error?.code);
+  // 4 = DEADLINE_EXCEEDED, 8 = RESOURCE_EXHAUSTED, 14 = UNAVAILABLE
+  return code === 4 || code === 8 || code === 14;
+};
+
+const commitBatchWithRetry = async (batch, options = {}) => {
+  const {
+    maxAttempts = 7,
+    baseDelayMs = 500,
+    maxDelayMs = 20000,
+    label = 'batch',
+  } = options;
+
+  let attempt = 0;
+  let lastError;
+
+  while (attempt < maxAttempts) {
+    attempt += 1;
+    try {
+      await batch.commit();
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableFirestoreError(error) || attempt >= maxAttempts) {
+        throw error;
+      }
+
+      const jitterMs = Math.floor(Math.random() * 250);
+      const delayMs = Math.min(baseDelayMs * (2 ** (attempt - 1)) + jitterMs, maxDelayMs);
+      console.warn(
+        `[seed-utils] Retry ${attempt}/${maxAttempts} for ${label} after ${delayMs}ms (code=${error?.code ?? 'unknown'})`
+      );
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+};
+
+const getCollectionWithRetry = async (collectionRef, options = {}) => {
+  const {
+    maxAttempts = 7,
+    baseDelayMs = 500,
+    maxDelayMs = 20000,
+    label = collectionRef?.id ?? 'collection',
+  } = options;
+
+  let attempt = 0;
+  let lastError;
+
+  while (attempt < maxAttempts) {
+    attempt += 1;
+    try {
+      return await collectionRef.get();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableFirestoreError(error) || attempt >= maxAttempts) {
+        throw error;
+      }
+
+      const jitterMs = Math.floor(Math.random() * 250);
+      const delayMs = Math.min(baseDelayMs * (2 ** (attempt - 1)) + jitterMs, maxDelayMs);
+      console.warn(
+        `[seed-utils] Retry ${attempt}/${maxAttempts} for read ${label} after ${delayMs}ms (code=${error?.code ?? 'unknown'})`
+      );
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+};
 const normalizeRecord = (record) => ({
   ...record,
   created_at: record.created_at ?? record.createdAt ?? null,
@@ -93,11 +167,15 @@ export const loadDbFromFirestore = async () => {
   const db = structuredClone(defaultDb);
 
   for (const key of collectionKeys) {
-    const snapshot = await firestore.collection(key).get();
+    const snapshot = await getCollectionWithRetry(firestore.collection(key), {
+      label: key,
+    });
     db[key] = snapshot.docs.map((doc) => ({
       ...doc.data(),
       id: doc.id,
     }));
+    // Spread out read load to reduce burst rate limiting.
+    await sleep(120);
   }
 
   return db;
@@ -108,7 +186,9 @@ export const saveDbToFirestore = async (db) => {
 
   for (const key of collectionKeys) {
     const collectionRef = firestore.collection(key);
-    const snapshot = await collectionRef.get();
+    const snapshot = await getCollectionWithRetry(collectionRef, {
+      label: key,
+    });
     const nextRecords = (normalizedDb[key] ?? []).map(normalizeRecord);
     const nextIds = new Set();
     const operations = [];
@@ -133,7 +213,7 @@ export const saveDbToFirestore = async (db) => {
       }
     }
 
-    const batchLimit = 450;
+    const batchLimit = 200;
 
     for (let i = 0; i < operations.length; i += batchLimit) {
       const batch = firestore.batch();
@@ -144,7 +224,10 @@ export const saveDbToFirestore = async (db) => {
           batch.delete(op.ref);
         }
       }
-      await batch.commit();
+      await commitBatchWithRetry(batch, {
+        label: `${key} chunk ${Math.floor(i / batchLimit) + 1}`,
+      });
+      await sleep(150);
     }
   }
 };
