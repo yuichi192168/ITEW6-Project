@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { studentDB } from '../../lib/database';
+import { studentDB, guidanceDB } from '../../lib/database';
 import { Card, EmptyState, ErrorMessage, FormInput, SectionHeader } from '../../components/ui/shared';
 
 interface Student {
@@ -23,8 +23,6 @@ interface DisciplineRecord {
   is_resolved: boolean;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL?.trim() || (import.meta.env.DEV ? 'http://localhost:8080' : '');
-
 export const AdminGuidance: React.FC = () => {
   const [records, setRecords] = useState<DisciplineRecord[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -44,10 +42,8 @@ export const AdminGuidance: React.FC = () => {
 
   const fetchRecords = async () => {
     try {
-      const response = await fetch(`${API_BASE}/admin/discipline-records`);
-      if (!response.ok) throw new Error('Failed to load discipline records');
-      const data = await response.json();
-      setRecords(data || []);
+      const data = await guidanceDB.getAllDisciplineRecords();
+      setRecords(data as DisciplineRecord[]);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load records');
@@ -87,13 +83,7 @@ export const AdminGuidance: React.FC = () => {
 
     try {
       setSaving(true);
-      const response = await fetch(`${API_BASE}/admin/discipline-records`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error('Failed to save discipline record');
-
+      await guidanceDB.addDisciplineRecord(payload);
       setSelectedStudentId('');
       setOffense('');
       setSeverity('Low');

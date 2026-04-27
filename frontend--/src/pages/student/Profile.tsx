@@ -3,8 +3,7 @@ import { Camera, Code, Edit, GraduationCap, Globe, Mail, User, Briefcase, X } fr
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
 import { ErrorMessage, LoadingSpinner } from '../../components/ui/shared';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL?.trim() || (import.meta.env.DEV ? 'http://localhost:8080' : '');
+import { studentDB } from '../../lib/database';
 
 interface StudentProfileRecord {
   id?: string;
@@ -83,19 +82,7 @@ export const StudentProfile: React.FC = () => {
   const fetchProfile = useMemo(
     () => async () => {
       if (!user?.id) return null;
-      try {
-        const response = await fetch(`${API_BASE}/student/${user.id}/profile`);
-        if (!response.ok) {
-          if (response.status === 404) return null;
-          throw new Error('Failed to fetch profile');
-        }
-        return (await response.json()) as StudentProfileRecord;
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Record not found') {
-          return null;
-        }
-        throw error;
-      }
+      return studentDB.getStudent(user.id);
     },
     [user?.id]
   );
@@ -189,16 +176,7 @@ export const StudentProfile: React.FC = () => {
         image: tempProfile.image,
       };
 
-      const response = await fetch(`${API_BASE}/student/${user.id}/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(normalizedProfile),
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.message || 'Unable to save student profile.');
-      }
+      await studentDB.updateStudent(user.id, normalizedProfile);
 
       const refreshedProfile = toProfileForm({ ...normalizedProfile, id: user.id }, user.name, user.email);
       setProfile(refreshedProfile);

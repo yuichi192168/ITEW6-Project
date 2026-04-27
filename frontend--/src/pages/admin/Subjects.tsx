@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Edit, Trash2 } from 'lucide-react';
-import { facultyDB } from '../../lib/database';
+import { facultyDB, coursesDB } from '../../lib/database';
 import { Card, SectionHeader, LoadingSpinner, ErrorMessage, SuccessMessage } from '../../components/ui/shared';
 import { emitSyncEvent, onSyncEvent } from '../../lib/syncEvents';
 
@@ -66,8 +66,6 @@ export const AdminSubjects: React.FC = () => {
     sections: '',
   });
 
-  const API_BASE = import.meta.env.VITE_API_BASE_URL?.trim() || (import.meta.env.DEV ? 'http://localhost:8080' : '');
-
   useEffect(() => {
     fetchSubjects();
     facultyDB.getAllFaculty().then((data) => setFacultyList(data as Faculty[])).catch(() => setFacultyList([]));
@@ -85,10 +83,8 @@ export const AdminSubjects: React.FC = () => {
   const fetchSubjects = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/admin/subjects`);
-      if (!response.ok) throw new Error('Failed to fetch subjects');
-      const data = await response.json();
-      setSubjects(data);
+      const data = await coursesDB.getAllCourses();
+      setSubjects(data as Subject[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch subjects');
     } finally {
@@ -99,32 +95,24 @@ export const AdminSubjects: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingSubject
-        ? `${API_BASE}/admin/subjects/${editingSubject.id}`
-        : `${API_BASE}/admin/subjects`;
-
-      const method = editingSubject ? 'PUT' : 'POST';
-
       const sectionsArray = formData.sections
         .split(',')
-        .map(s => s.trim())
+        .map((s) => s.trim())
         .filter(Boolean);
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          facultyId: formData.facultyId || undefined,
-          sections: sectionsArray,
-          autoAssignRegular: true,
-        })
-      });
+      const subjectPayload = {
+        ...formData,
+        facultyId: formData.facultyId || undefined,
+        sections: sectionsArray,
+        autoAssignRegular: true,
+      };
 
-      if (!response.ok) throw new Error('Failed to save subject');
+      if (editingSubject) {
+        await coursesDB.updateCourse(String(editingSubject.id), subjectPayload);
+      } else {
+        await coursesDB.addCourse(subjectPayload);
+      }
 
-      const savedSubject = await response.json();
-      
       setSuccess(editingSubject ? 'Subject updated successfully' : 'Subject created successfully');
       setShowForm(false);
       setEditingSubject(null);
@@ -133,9 +121,9 @@ export const AdminSubjects: React.FC = () => {
       
       // Emit sync event for other pages to listen
       if (editingSubject) {
-        emitSyncEvent('subjectUpdated', savedSubject, 'Subjects');
+        emitSyncEvent('subjectUpdated', { id: editingSubject.id }, 'Subjects');
       } else {
-        emitSyncEvent('subjectCreated', savedSubject, 'Subjects');
+        emitSyncEvent('subjectCreated', subjectPayload, 'Subjects');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save subject');
@@ -164,12 +152,7 @@ export const AdminSubjects: React.FC = () => {
     if (!confirm('Are you sure you want to delete this subject?')) return;
 
     try {
-      const response = await fetch(`${API_BASE}/admin/subjects/${subjectId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) throw new Error('Failed to delete subject');
-
+      await coursesDB.deleteCourse(String(subjectId));
       setSuccess('Subject deleted successfully');
       fetchSubjects();
       

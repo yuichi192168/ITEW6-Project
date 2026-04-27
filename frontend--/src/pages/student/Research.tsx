@@ -57,7 +57,7 @@ export const StudentResearch: React.FC = () => {
 
       try {
         const data = await studentDB.getStudentResearch(user.id);
-        setResearch(data);
+        setResearch(data as unknown as StudentResearch[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unable to load research');
       } finally {

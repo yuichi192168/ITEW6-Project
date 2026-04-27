@@ -35,12 +35,25 @@ const ensureAdminApp = () => {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const shouldUseEmulator = String(process.env.FIREBASE_USE_EMULATOR ?? '').toLowerCase() === 'true';
+  const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+  const hasServiceAccountEnv = Boolean(clientEmail && privateKey);
 
   if (!projectId) {
     throw new Error('Missing Firebase Admin environment variable: FIREBASE_PROJECT_ID');
   }
 
-  if (!clientEmail || !privateKey) {
+  if (shouldUseEmulator) {
+    if (!emulatorHost) {
+      throw new Error('FIREBASE_USE_EMULATOR is true but FIRESTORE_EMULATOR_HOST is missing');
+    }
+
+    admin.initializeApp({ projectId });
+    process.env.FIRESTORE_EMULATOR_HOST = emulatorHost;
+    return admin.firestore();
+  }
+
+  if (!hasServiceAccountEnv) {
     throw new Error('Missing Firebase Admin service account environment variables: FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY');
   }
 

@@ -341,8 +341,17 @@ export const batchWrite = async (
 };
 
 export const studentDB = {
-  getStudent: (studentId: string) => getDocument('students', studentId),
-  getAllStudents: () => getCollection('students'),
+  getStudent: async (studentId: string) => {
+    const firestoreDb = requireDb();
+    const studentSnapshot = await getDoc(doc(firestoreDb, 'students', studentId));
+    if (!studentSnapshot.exists()) return null;
+    return { id: studentSnapshot.id, ...(studentSnapshot.data() as Record<string, any>) } as any;
+  },
+  getAllStudents: async () => {
+    const firestoreDb = requireDb();
+    const snapshot = await getDocs(collection(firestoreDb, 'students'));
+    return snapshot.docs.map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, any>) }));
+  },
   getStudentGrades: async (studentId: string, term = 'all') => {
     const firestoreDb = requireDb();
     const [gradesSnapshot, scheduleSnapshot, courseSnapshot] = await Promise.all([
@@ -497,8 +506,17 @@ export const studentDB = {
 };
 
 export const facultyDB = {
-  getFaculty: (facultyId: string) => getDocument('faculties', facultyId),
-  getAllFaculty: () => getCollection('faculties'),
+  getFaculty: async (facultyId: string) => {
+    const firestoreDb = requireDb();
+    const facultySnapshot = await getDoc(doc(firestoreDb, 'faculties', facultyId));
+    if (!facultySnapshot.exists()) return null;
+    return { id: facultySnapshot.id, ...(facultySnapshot.data() as Record<string, any>) } as any;
+  },
+  getAllFaculty: async () => {
+    const firestoreDb = requireDb();
+    const snapshot = await getDocs(collection(firestoreDb, 'faculties'));
+    return snapshot.docs.map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, any>) }));
+  },
   addFaculty: async (data: any) => {
     if (data?.id) {
       await updateDocument('faculties', String(data.id), data);
@@ -1012,22 +1030,48 @@ export const adminDB = {
 
 export const coursesDB = {
   getCourse: async (courseId: string) => {
-    const subject = await getDocument('subjects', courseId);
-    if (subject) return subject;
-    return getDocument('courses', courseId);
+    const firestoreDb = requireDb();
+    const subjectSnapshot = await getDoc(doc(firestoreDb, 'subjects', courseId));
+    if (subjectSnapshot.exists()) {
+      return { id: subjectSnapshot.id, ...(subjectSnapshot.data() as Record<string, any>) };
+    }
+    const courseSnapshot = await getDoc(doc(firestoreDb, 'courses', courseId));
+    if (courseSnapshot.exists()) {
+      return { id: courseSnapshot.id, ...(courseSnapshot.data() as Record<string, any>) };
+    }
+    return null;
   },
   getAllCourses: async () => {
-    const [subjects, courses] = await Promise.all([
-      getCollection('subjects').catch(() => []),
-      getCollection('courses').catch(() => []),
+    const firestoreDb = requireDb();
+    const [subjectsSnapshot, coursesSnapshot] = await Promise.all([
+      getDocs(collection(firestoreDb, 'subjects')),
+      getDocs(collection(firestoreDb, 'courses')),
     ]);
 
+    const subjects = subjectsSnapshot.docs.map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, any>) }));
     if (subjects.length > 0) return subjects;
-    return courses;
+
+    return coursesSnapshot.docs.map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, any>) }));
   },
-  addCourse: (data: any) => addDocument('courses', data),
-  updateCourse: (courseId: string, data: any) => updateDocument('courses', courseId, data),
-  deleteCourse: (courseId: string) => deleteDocument('courses', courseId),
+  addCourse: async (data: any) => {
+    const firestoreDb = requireDb();
+    if (data?.id) {
+      const courseId = String(data.id);
+      await setDoc(doc(firestoreDb, 'courses', courseId), { ...data, id: courseId });
+      return courseId;
+    }
+    const courseRef = doc(collection(firestoreDb, 'courses'));
+    await setDoc(courseRef, { ...data, id: courseRef.id });
+    return courseRef.id;
+  },
+  updateCourse: async (courseId: string, data: any) => {
+    const firestoreDb = requireDb();
+    await updateDoc(doc(firestoreDb, 'courses', courseId), data);
+  },
+  deleteCourse: async (courseId: string) => {
+    const firestoreDb = requireDb();
+    await deleteDoc(doc(firestoreDb, 'courses', courseId));
+  },
 };
 
 export const gradesDB = {
@@ -1039,11 +1083,31 @@ export const gradesDB = {
 };
 
 export const schedulesDB = {
-  getSchedule: (scheduleId: string) => getDocument('schedules', scheduleId),
-  getAllSchedules: () => getCollection('schedules'),
-  addSchedule: (data: any) => addDocument('schedules', data),
-  updateSchedule: (scheduleId: string, data: any) => updateDocument('schedules', scheduleId, data),
-  deleteSchedule: (scheduleId: string) => deleteDocument('schedules', scheduleId),
+  getSchedule: async (scheduleId: string) => {
+    const firestoreDb = requireDb();
+    const scheduleSnapshot = await getDoc(doc(firestoreDb, 'schedules', scheduleId));
+    if (!scheduleSnapshot.exists()) return null;
+    return { id: scheduleSnapshot.id, ...(scheduleSnapshot.data() as Record<string, any>) };
+  },
+  getAllSchedules: async () => {
+    const firestoreDb = requireDb();
+    const snapshot = await getDocs(collection(firestoreDb, 'schedules'));
+    return snapshot.docs.map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, any>) }));
+  },
+  addSchedule: async (data: any) => {
+    const firestoreDb = requireDb();
+    const scheduleRef = doc(collection(firestoreDb, 'schedules'));
+    await setDoc(scheduleRef, { ...data, id: scheduleRef.id });
+    return scheduleRef.id;
+  },
+  updateSchedule: async (scheduleId: string, data: any) => {
+    const firestoreDb = requireDb();
+    await updateDoc(doc(firestoreDb, 'schedules', scheduleId), data);
+  },
+  deleteSchedule: async (scheduleId: string) => {
+    const firestoreDb = requireDb();
+    await deleteDoc(doc(firestoreDb, 'schedules', scheduleId));
+  },
   reassignFaculty: async (scheduleId: string, facultyId: string) => {
     const firestoreDb = requireDb();
     await updateDoc(doc(firestoreDb, 'schedules', scheduleId), { faculty_id: facultyId, facultyId });
@@ -1113,4 +1177,15 @@ export const announcementsDB = {
 export const guidanceDB = {
   getStudentDisciplineRecords: (studentId?: string, email?: string) =>
     studentDB.getDisciplineRecords({ studentId, email }),
+  getAllDisciplineRecords: async () => {
+    const firestoreDb = requireDb();
+    const snapshot = await getDocs(collection(firestoreDb, 'disciplineRecords'));
+    return snapshot.docs.map((docItem) => ({ id: docItem.id, ...(docItem.data() as Record<string, any>) }));
+  },
+  addDisciplineRecord: async (data: any) => {
+    const firestoreDb = requireDb();
+    const recordRef = doc(collection(firestoreDb, 'disciplineRecords'));
+    await setDoc(recordRef, { ...data, id: recordRef.id });
+    return recordRef.id;
+  },
 };

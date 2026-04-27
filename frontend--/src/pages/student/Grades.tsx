@@ -14,13 +14,6 @@ interface StudentGrade {
   totalGrade: number;
 }
 
-interface StudentGradesResponse {
-  studentId: string;
-  grades: StudentGrade[];
-  gwa: number;
-  totalCourses: number;
-}
-
 export const StudentGrades: React.FC = () => {
   const { user } = useAuth();
   const [selectedTerm, setSelectedTerm] = useState<string>('All Terms');

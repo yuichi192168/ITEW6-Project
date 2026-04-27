@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAsync } from '../../hooks/useAsync';
-import { schedulesDB, facultyDB, studentDB } from '../../lib/database';
+import { schedulesDB, facultyDB, studentDB, coursesDB } from '../../lib/database';
 import { Card, EmptyState, ErrorMessage, LoadingSpinner } from '../../components/ui/shared';
 import { onSyncEvent } from '../../lib/syncEvents';
 
@@ -72,8 +72,6 @@ type ToastState = {
 } | null;
 
 export const AdminScheduling: React.FC = () => {
-  const API_BASE = import.meta.env.VITE_API_BASE_URL?.trim() || (import.meta.env.DEV ? 'http://localhost:8080' : '');
-
   const { data: schedules, loading, error, execute: fetchSchedules } = useAsync<Schedule[]>(() =>
     schedulesDB.getAllSchedules().then((data: any) => data as Schedule[])
   );
@@ -84,7 +82,7 @@ export const AdminScheduling: React.FC = () => {
     studentDB.getAllStudents().then((data: any) => data as Student[])
   );
   const { data: subjects, execute: fetchSubjects } = useAsync<Subject[]>(() =>
-    fetch(`${API_BASE}/admin/subjects`).then((response) => response.json()) as Promise<Subject[]>
+    coursesDB.getAllCourses().then((data) => data as Subject[])
   );
   const [formData, setFormData] = useState<ScheduleFormData>({
     courseId: '',
