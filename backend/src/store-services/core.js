@@ -62,9 +62,14 @@ const isFirestoreUnavailableError = (error) => {
   const details = String(error.details ?? '').toLowerCase();
 
   return (
+    error.code === 8 ||
     error.code === 14 ||
+    message.includes('resource_exhausted') ||
+    message.includes('quota exceeded') ||
     message.includes('unavailable') ||
     message.includes('econnrefused') ||
+    details.includes('resource_exhausted') ||
+    details.includes('quota exceeded') ||
     details.includes('unavailable') ||
     details.includes('econnrefused')
   );

@@ -35495,6 +35495,26 @@
       "enrolledClasses": [],
       "registered_events": [],
       "registeredEvents": []
+    },
+    {
+      "name": "Johnro",
+      "email": "maliticjohnro08@gmail.com",
+      "idNumber": "2203364",
+      "section": "1IT-A",
+      "year": "1st",
+      "program": "BSIT",
+      "status": "Regular",
+      "phone": "03051665161",
+      "address": "adasfsad",
+      "dateOfBirth": "",
+      "skills": "asdsa",
+      "organizations": "dada",
+      "id": "9HxZ6NFiVzXDveVdNYhZVVVqqsT2",
+      "role": "student",
+      "createdAt": "2026-04-27T03:34:40.714Z",
+      "created_at": "2026-04-27T03:34:40.714Z",
+      "updated_at": "2026-04-27T03:34:40.714Z",
+      "updatedAt": "2026-04-27T03:34:40.714Z"
     }
   ],
   "faculties": [

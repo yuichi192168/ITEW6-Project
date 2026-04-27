@@ -18,6 +18,20 @@ interface Syllabus {
   status?: 'draft' | 'published';
   updatedAt?: string;
   updated_at?: string;
+  section?: string;
+  yearLevel?: string | number;
+}
+
+interface FacultyClass {
+  id: string;
+  subjectId?: string;
+  courseId?: string;
+  section?: string;
+  yearLevel?: string | number;
+  courseName?: string;
+  courseCode?: string;
+  subjectName?: string;
+  subjectCode?: string;
 }
 
 export const FacultySyllabus: React.FC = () => {
@@ -27,8 +41,11 @@ export const FacultySyllabus: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [classes, setClasses] = useState<FacultyClass[]>([]);
   const [courseId, setCourseId] = useState('');
   const [title, setTitle] = useState('');
+  const [status, setStatus] = useState<'draft' | 'published'>('draft');
+  const [content, setContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
   const fetchFacultyEndpoint = async (path: string, init?: RequestInit) => {
@@ -61,8 +78,38 @@ export const FacultySyllabus: React.FC = () => {
     fetchSyllabi();
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchClasses = async () => {
+      try {
+        const response = await fetchFacultyEndpoint(`/faculty/${user.id}/classes`);
+        if (!response.ok) {
+          setClasses([]);
+          return;
+        }
+
+        const data = (await response.json()) as FacultyClass[];
+        setClasses(data);
+
+        if (!courseId && data.length > 0) {
+          const initialClass = data[0];
+          setCourseId(String(initialClass.id));
+        }
+      } catch {
+        setClasses([]);
+      }
+    };
+
+    fetchClasses();
+  }, [user?.id]);
+
+  const selectedClass = classes.find((cls) => String(cls.id) === String(courseId));
+
   const handleUpload = async () => {
-    if (!user?.id || !courseId || !title || !file) {
+    const targetSubjectId = selectedClass?.subjectId || selectedClass?.courseId || '';
+
+    if (!user?.id || !courseId || !title || !file || !targetSubjectId) {
       setError('Please fill all fields and select a file');
       return;
     }
@@ -75,10 +122,15 @@ export const FacultySyllabus: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          subjectId: courseId,
+          subjectId: targetSubjectId,
+          courseId: targetSubjectId,
+          classId: selectedClass?.id,
           title,
+          content,
           fileUrl: file.name,
-          status: 'draft',
+          status,
+          section: selectedClass?.section ?? null,
+          yearLevel: selectedClass?.yearLevel ?? null,
         }),
       });
 
@@ -88,6 +140,8 @@ export const FacultySyllabus: React.FC = () => {
       setShowModal(false);
       setCourseId('');
       setTitle('');
+      setStatus('draft');
+      setContent('');
       setFile(null);
       setError(null);
     } catch (err) {
@@ -144,16 +198,42 @@ export const FacultySyllabus: React.FC = () => {
             <div className="space-y-4">
               <input
                 type="text"
-                placeholder="Course ID"
+                placeholder="Syllabus Title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+              <select
                 value={courseId}
                 onChange={(e) => setCourseId(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+              >
+                <option value="">Select class/subject</option>
+                {classes.map((cls) => {
+                  const code = cls.subjectCode || cls.courseCode || 'N/A';
+                  const name = cls.subjectName || cls.courseName || 'Untitled class';
+                  const section = cls.section || 'Unassigned section';
+
+                  return (
+                    <option key={cls.id} value={cls.id}>
+                      {code} - {name} ({section})
+                    </option>
+                  );
+                })}
+              </select>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+              <textarea
+                placeholder="Syllabus details (topics, grading rules, references)"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
               <input
@@ -161,6 +241,17 @@ export const FacultySyllabus: React.FC = () => {
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
+              {selectedClass && (
+                <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg">
+                  <p>
+                    <strong>Subject:</strong> {selectedClass.subjectCode || selectedClass.courseCode || 'N/A'} - {selectedClass.subjectName || selectedClass.courseName || 'Unknown'}
+                  </p>
+                  <p>
+                    <strong>Section:</strong> {selectedClass.section || 'Unassigned'}
+                    <strong className="ml-3">Year:</strong> {String(selectedClass.yearLevel ?? 'Unassigned')}
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setShowModal(false)}
@@ -195,6 +286,14 @@ export const FacultySyllabus: React.FC = () => {
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-gray-800">{syllabus.subjectCode || syllabus.courseCode || 'N/A'}</h3>
                     <p className="text-gray-600 text-sm">{syllabus.title}</p>
+                    {(syllabus.section || syllabus.yearLevel) && (
+                      <p className="text-gray-500 text-xs mt-1">
+                        Section: {syllabus.section || 'Unassigned'} | Year: {String(syllabus.yearLevel ?? 'Unassigned')}
+                      </p>
+                    )}
+                    {syllabus.content && (
+                      <p className="text-gray-600 text-xs mt-2 line-clamp-2">{syllabus.content}</p>
+                    )}
                     <p className="text-gray-500 text-xs mt-2">
                       Last updated: {new Date(syllabus.updatedAt || syllabus.updated_at || Date.now()).toLocaleDateString()}
                     </p>
